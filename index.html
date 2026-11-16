@@ -325,6 +325,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 .dyro td{vertical-align:top}.pareto80 td{font-weight:700}.ptbar{height:6px;border-radius:4px;background:var(--r);opacity:.75}
 .imgrp{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--bd)}
 .imlog{font:13px/1.5 ui-monospace,Menlo,monospace;background:#11221b;color:#cfe3d8;border-radius:12px;padding:10px 12px;max-height:260px;overflow:auto;white-space:pre-wrap;margin-top:10px}
+.dsew{display:flex;align-items:center;gap:4px;font-weight:700;color:var(--g2);font-size:14px;margin-top:2px}.dsew svg.i{width:15px;height:15px}
 .rgrid{margin-top:14px}
 </style>
 </head>
@@ -336,7 +337,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "16/11/2026 10:20";
+const VERSION = "16/11/2026 16:30";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -968,6 +969,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
       (d.group ? '<dt>' + esc(T("Nhóm máy")) + '</dt><dd>' + esc(d.group) + '</dd>' : "") +
       (d.gauge ? '<dt>' + esc(T("Loại máy")) + '</dt><dd>' + esc(d.gauge) + '</dd>' : "") +
       (true ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.noProd ? '<b class="nopt">' + esc(T("Không có mã hàng")) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
+      (d.sewer ? '<dt>' + esc(T("Người may")) + '</dt><dd><b>' + esc(d.sewer) + '</b></dd>' : "") +
       (d.area ? '<dt>' + esc(T("Khu vực")) + '</dt><dd>' + esc(d.area) + '</dd>' : "") +
       ((d.maker || d.model) ? '<dt>' + esc(T("Hãng / Model")) + '</dt><dd>' + esc([d.maker, d.model].filter(Boolean).join(" / ")) + '</dd>' : "") +
       (d.since ? '<dt>' + esc(T("Ngày sử dụng")) + '</dt><dd>' + esc(fmtD(d.since)) + '</dd>' : "") +
@@ -1613,7 +1615,7 @@ VIEWS.daily = {wide: true, live: true, title: () => T("Báo cáo cuối ngày"),
   else h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Tài khoản này chỉ xem. Tổ trưởng, quản đốc hoặc iPad máy nhập báo cáo cuối ngày.")) + '</div>';
   const n0 = all.length - rp.length, fb = (k, t, n) => '<button class="fc' + (F.flt === k ? " on" : "") + '" onclick="F.flt=\'' + k + '\';drawDay()">' + esc(T(t)) + ' <span>' + n + '</span></button>';
   h += '<div class="fchips" id="dyflt">' + fb("", "Tất cả", all.length) + fb("no", "Chưa báo cáo", n0) + fb("ok", "Đã báo cáo", rp.length) + '</div>';
-  h += '<div class="search lc">' + ic("search") + '<input id="dyq" placeholder="' + esc(T("Tìm mã máy, tên máy, mã hàng")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDay()"></div>';
+  h += '<div class="search lc">' + ic("search") + '<input id="dyq" placeholder="' + esc(T("Tìm mã máy, tên máy, người may, mã hàng")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDay()"></div>';
   h += '<div id="dylist"></div>';
   return h;
 }, after(){ dayFetch(F.date); drawDay(); }};
@@ -1623,16 +1625,16 @@ function drawDay(){
   const date = F.date, E = (dayDoc(date) || {}).m || {}, q = (F.q || "").trim().toLowerCase();
   const all = knitDevs().map(d => ({c: d._id, d, e: E[d._id] || null}));
   Object.keys(E).forEach(c => { if (!all.some(x => x.c === c)) all.push({c, d: S.dev[c] || {_id: c, name: E[c].devName || ""}, e: E[c]}); });   // máy đã ngừng / đã xoá nhưng có báo cáo
-  const L = all.filter(x => (!F.flt || (F.flt === "ok") === !!x.e) && (!q || (x.c + " " + (x.d.name || "") + " " + (x.d.product || "") + " " + (x.e ? x.e.lines.map(l => l.product).join(" ") : "")).toLowerCase().indexOf(q) >= 0));
+  const L = all.filter(x => (!F.flt || (F.flt === "ok") === !!x.e) && (!q || (x.c + " " + (x.d.name || "") + " " + (x.d.sewer || "") + " " + (x.e && x.e.sewer || "") + " " + (x.d.product || "") + " " + (x.e ? x.e.lines.map(l => l.product).join(" ") : "")).toLowerCase().indexOf(q) >= 0));
   if (!L.length){ el.innerHTML = empty("list", T("Không có máy phù hợp")); return; }
   const cd = canDaily();
-  el.innerHTML = '<div class="tscroll"><table class="atbl dytbl"><thead><tr><th>' + [T("Máy"), T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Tỷ lệ loại 2"), T("Người nhập")].map(esc).join("</th><th>") + '</th><th></th></tr></thead><tbody>' +
+  el.innerHTML = '<div class="tscroll"><table class="atbl dytbl"><thead><tr><th>' + [T("Máy"), T("Người may"), T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Tỷ lệ loại 2"), T("Người nhập")].map(esc).join("</th><th>") + '</th><th></th></tr></thead><tbody>' +
     L.map(x => { const e = x.e;
       if (!e) return '<tr class="nr"' + (cd ? ' onclick="dayPop(\'' + esc(x.c) + '\',\'' + date + '\')"' : ' style="cursor:default"') + '>' + tDev(x.c) +
-        '<td class="ttx mu">' + esc(x.d.noProd ? T("Không có mã hàng") : x.d.product || "–") + '</td><td colspan="4"><span class="chip a">' + esc(T("Chưa báo cáo")) + '</span></td>' +
-        '<td class="tact">' + (cd ? '<button class="btn sm" onclick="event.stopPropagation();dayPop(\'' + esc(x.c) + '\',\'' + date + '\')">' + ic("plus") + esc(T("Nhập")) + '</button>' : "") + '</td></tr>';
-      return '<tr onclick="dayPop(\'' + esc(x.c) + '\',\'' + date + '\')">' + tDev(x.c) +
-        '<td class="ttx">' + e.lines.map(l => '<div>' + esc(l.product) + '</div>').join("") + '</td>' +
+        '<td class="tnm mu">' + esc(x.d.sewer || "–") + '</td><td class="ttx mu">' + esc(x.d.noProd ? T("Không có mã hàng") : x.d.product || "–") + '</td><td colspan="4"><span class="chip a">' + esc(T("Chưa báo cáo")) + '</span></td>' +
+        '<td class="tact">' + (cd ? '<button class="btn sm" onclick="event.stopPropagation();dayPop(\'' + esc(x.c) + '\',\'' + date + '\')" aria-label="' + esc(T("Nhập")) + '" title="' + esc(T("Nhập")) + '">' + ic("plus") + '</button>' : "") + '</td></tr>';
+      return '<tr onclick="dayPop(\'' + esc(x.c) + '\',\'' + date + '\')">' + tDev(x.c) + '<td class="tnm">' + esc(e.sewer || "–") + '</td>' +
+        '<td class="ttx">' + e.lines.map(l => '<div>' + esc(l.product || "–") + '</div>').join("") + '</td>' +
         '<td class="n">' + e.lines.map(l => '<div>' + esc(qtyText(l.qty)) + '</div>').join("") + '</td>' +
         '<td class="n">' + e.lines.map(l => '<div' + (l.b2 ? ' style="color:var(--r);font-weight:700"' : "") + '>' + esc(qtyText(l.b2)) + '</div>').join("") + '</td>' +
         '<td class="n">' + e.lines.map(l => '<div>' + rateHtml(l.qty, l.b2) + '</div>').join("") + '</td>' +
@@ -1649,13 +1651,16 @@ function dayBand(d){
 function dayDevHist(c){
   const L = S.daily.filter(D => D.m && D.m[c]).sort((a, b) => a._id < b._id ? 1 : -1).slice(0, 14);
   if (!L.length) return '<div class="cnone">' + esc(T("Chưa có báo cáo cuối ngày nào trong 2 tháng gần đây.")) + '</div>';
-  return '<div class="tscroll"><table class="atbl dytbl"><thead><tr><th>' + [T("Ngày"), T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Tỷ lệ loại 2"), T("Người nhập")].map(esc).join("</th><th>") + '</th></tr></thead><tbody>' +
-    L.map(D => { const e = D.m[c]; return '<tr onclick="dayPop(\'' + esc(c) + '\',\'' + D._id + '\')"><td class="tdt">' + esc(fmtD(D._id)) + '</td>' +
-      '<td class="ttx">' + e.lines.map(l => '<div>' + esc(l.product) + '</div>').join("") + '</td><td class="n">' + esc(qtyText(e.qty)) + '</td>' +
+  return '<div class="tscroll"><table class="atbl dytbl"><thead><tr><th>' + [T("Ngày"), T("Người may"), T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Tỷ lệ loại 2"), T("Người nhập")].map(esc).join("</th><th>") + '</th></tr></thead><tbody>' +
+    L.map(D => { const e = D.m[c]; return '<tr onclick="dayPop(\'' + esc(c) + '\',\'' + D._id + '\')"><td class="tdt">' + esc(fmtD(D._id)) + '</td><td class="tnm">' + esc(e.sewer || "–") + '</td>' +
+      '<td class="ttx">' + e.lines.map(l => '<div>' + esc(l.product || "–") + '</div>').join("") + '</td><td class="n">' + esc(qtyText(e.qty)) + '</td>' +
       '<td class="n"' + (e.b2 ? ' style="color:var(--r);font-weight:700"' : "") + '>' + esc(qtyText(e.b2)) + '</td><td class="n">' + rateHtml(e.qty, e.b2) + '</td><td class="tnm">' + esc(sName(e.byName)) + '</td></tr>'; }).join("") +
     '</tbody></table></div>';
 }
 
+/* Gợi ý tên người may: tên đã gán cho các máy + công nhân / tổ trưởng */
+function sewList(){ const n = new Set(); Object.values(S.dev).forEach(d => { if (d.sewer) n.add(d.sewer); }); people().forEach(a => n.add(a.name));
+  return '<datalist id="dl_sew">' + Array.from(n).sort().map(x => '<option value="' + esc(x) + '">').join("") + '</datalist>'; }
 /* ---- Popup nhập / sửa báo cáo cuối ngày của 1 máy ---- */
 let DP = null;
 const dpNew = d => ({id: "l" + uid(), product: d && !d.noProd ? (d.product || "") : "", ta: "", doi: "", defs: [{ta: "", doi: "", cause: ""}]});
@@ -1663,7 +1668,7 @@ function dayPop(c, date){
   date = date || today();
   const d = S.dev[c], e = dayEnt(date, c);
   if (!d && !e) return;
-  DP = {c, date, ro: !canDaily(), del: false, lines: e ? e.lines.map(l => { const q = splitQ(l.qty);
+  DP = {c, date, ro: !canDaily(), del: false, sewer: e ? (e.sewer || "") : ((d && d.sewer) || ""), lines: e ? e.lines.map(l => { const q = splitQ(l.qty);
     return {id: l.id || "l" + uid(), product: l.product || "", ta: q[0], doi: q[1], defs: (l.defects || []).map(x => { const b = splitQ(x.b2); return {ta: b[0], doi: b[1], cause: x.cause || ""}; })}; }) : [dpNew(d)]};
   if (!DP.lines.length) DP.lines = [dpNew(d)];
   closePop(); F.actId = ""; F.actPin = "";
@@ -1688,17 +1693,17 @@ function dpDraw(){
     (e.edits && e.edits.length ? '<br>' + esc(T("Sửa gần nhất: {n} lúc {t} ({k} lần sửa)", {n: e.byName, t: fmtDT(e.at), k: e.edits.length})) : "") + '</div>' : "";
   if (DP.ro){   // chỉ xem
     el.innerHTML = info + (e ? '<div class="tscroll"><table class="atbl dyro"><thead><tr><th>' + [T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Tỷ lệ loại 2"), T("Chi tiết loại 2")].map(esc).join("</th><th>") + '</th></tr></thead><tbody>' +
-      e.lines.map(l => '<tr style="cursor:default"><td>' + esc(l.product) + '</td><td class="thm">' + esc(qtyText(l.qty)) + '</td><td class="thm">' + esc(qtyText(l.b2)) + '</td><td>' + rateHtml(l.qty, l.b2) + '</td><td class="ttx">' + esc(defText(l) || "–") + '</td></tr>').join("") +
+      e.lines.map(l => '<tr style="cursor:default"><td>' + esc(l.product || "–") + (e.sewer ? '<br><span class="mu sm">' + esc(T("Người may")) + ': ' + esc(e.sewer) + '</span>' : "") + '</td><td class="thm">' + esc(qtyText(l.qty)) + '</td><td class="thm">' + esc(qtyText(l.b2)) + '</td><td>' + rateHtml(l.qty, l.b2) + '</td><td class="ttx">' + esc(defText(l) || "–") + '</td></tr>').join("") +
       '</tbody></table></div>' : empty("list", T("Chưa báo cáo"))) + '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Đóng")) + '</button></div>';
     return;
   }
-  const P = S.cfg.products || [], C = S.cfg.defects || [], many = DP.lines.length > 1;
+  const C = S.cfg.defects || [], many = DP.lines.length > 1;
   let h = info;
+  h += '<div class="lc"><label>' + esc(T("Người may")) + '</label><input id="dpsew" list="dl_sew" autocomplete="off" placeholder="' + esc(T("Tên người may máy này")) + '" value="' + esc(DP.sewer) + '" oninput="DP.sewer=this.value">' + sewList() + '</div>';
   h += DP.lines.map((l, i) => {
-    const opts = P.concat(l.product && P.indexOf(l.product) < 0 ? [l.product] : []), co = j => { const cur = l.defs[j].cause; return C.concat(cur && C.indexOf(cur) < 0 ? [cur] : []); };
-    return '<div class="dyl"><div class="row"><div class="f b">' + esc(T("Mã hàng")) + (many ? " " + (i + 1) : "") + '</div>' + (many ? '<button class="btn sm w" style="color:var(--r)" onclick="dpRm(' + i + ')" aria-label="' + esc(T("Xoá")) + '">' + ic("trash") + '</button>' : "") + '</div>' +
-      '<select onchange="DP.lines[' + i + '].product=this.value"><option value="">' + esc(T("— Chọn mã hàng —")) + '</option>' + opts.map(o => '<option' + (o === l.product ? " selected" : "") + '>' + esc(o) + '</option>').join("") + '</select>' +
-      '<label class="dyll req">' + esc(T("Sản lượng thực tế")) + '</label>' + qIn("DP.lines[" + i + "]", l, i) +
+    const co = j => { const cur = l.defs[j].cause; return C.concat(cur && C.indexOf(cur) < 0 ? [cur] : []); };
+    return '<div class="dyl">' + (many ? '<div class="b" style="margin-bottom:4px">' + esc(T("Mã hàng")) + ': ' + esc(l.product || "–") + '</div>' : "") +
+      '<label class="dyll req" style="margin-top:0">' + esc(T("Sản lượng thực tế")) + '</label>' + qIn("DP.lines[" + i + "]", l, i) +
       '<label class="dyll">' + esc(T("Hàng loại 2")) + ' <span class="mu sm" style="font-weight:400">' + esc(T("(không có thì để trống)")) + '</span></label>' +
       l.defs.map((x, j) => '<div class="dyd">' + qIn("DP.lines[" + i + "].defs[" + j + "]", x, i) +
         '<select onchange="DP.lines[' + i + '].defs[' + j + '].cause=this.value"><option value="">' + esc(T("— Nguyên nhân —")) + '</option>' + co(j).map(o => '<option' + (o === x.cause ? " selected" : "") + '>' + esc(o) + '</option>').join("") + '</select>' +
@@ -1706,7 +1711,6 @@ function dpDraw(){
       '<button class="btn sm gh" onclick="dpDefAdd(' + i + ')">' + ic("plus") + esc(T("Thêm hàng loại 2")) + '</button>' +
       '<div class="dysum" id="dys' + i + '">' + dpSumTxt(i) + '</div></div>';
   }).join("");
-  h += '<button class="btn sm w" style="margin-bottom:12px" onclick="dpAdd()">' + ic("plus") + esc(T("Thêm mã hàng khác (máy đổi mã trong ngày)")) + '</button>';
   h += actorBox("Người báo cáo");
   if (DP.del) h += '<div class="card" style="border:1px solid #f0b9b9"><div class="lc"><label class="req">' + esc(T("Mã PIN / mật khẩu của {n}", {n: S.user.name})) + '</label><input id="dpdel_pw" type="password" autocomplete="off" onkeydown="if(event.key===\'Enter\')dpDelGo()"></div>' +
     '<div class="btns"><button class="btn w" onclick="DP.del=false;dpDraw()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="dpDelGo()">' + ic("trash") + esc(T("Xoá báo cáo này")) + '</button></div></div>';
@@ -1724,7 +1728,6 @@ function dpSave(){
   const out = []; let tq = 0, tb = 0;
   for (let i = 0; i < DP.lines.length; i++){
     const l = DP.lines[i], nm = T("Mã hàng") + (DP.lines.length > 1 ? " " + (i + 1) : "");
-    if (!l.product){ toast(T("{n}: chọn mã hàng", {n: nm}), "err"); return; }
     const q = qParse(l.ta, l.doi);
     if (q === null){ toast(T("{n}: số lượng không hợp lệ", {n: nm}), "err"); return; }
     if (!q){ toast(T("{n}: nhập sản lượng thực tế", {n: nm}), "err"); return; }
@@ -1732,18 +1735,19 @@ function dpSave(){
     for (const x of l.defs){
       const b = qParse(x.ta, x.doi);
       if (b === null){ toast(T("{n}: số lượng không hợp lệ", {n: nm}), "err"); return; }
-      if (!b){ if (x.cause){ toast(T("{n}: nhập số lượng hàng loại 2 ({c})", {n: nm, c: x.cause}), "err"); return; } continue; }
-      if (!x.cause){ toast(T("{n}: chọn nguyên nhân hàng loại 2", {n: nm}), "err"); return; }
-      defs.push({b2: b, cause: x.cause});
+      if (!b && !x.cause) continue;   // hàng loại 2 không bắt buộc: bỏ trống thì bỏ qua
+      defs.push({b2: b, cause: x.cause || ""});
     }
     const b2 = defs.reduce((a, x) => a + x.b2, 0);
     if (b2 > q){ toast(T("{n}: hàng loại 2 lớn hơn sản lượng thực tế", {n: nm}), "err"); return; }
     out.push({id: l.id, product: l.product, qty: q, b2, defects: defs}); tq += q; tb += b2;
   }
-  const date = DP.date, c = DP.c;
+  const date = DP.date, c = DP.c, sw = $("#dpsew"); if (sw) DP.sewer = sw.value;
   const run = () => {
     const who = me(), now = Date.now(), old = dayEnt(date, c), d = S.dev[c] || {};
-    const ent = {devName: d.name || (old && old.devName) || "", group: d.group || (old && old.group) || "", area: d.area || (old && old.area) || "", lines: out, qty: tq, b2: tb,
+    const sewer = String(DP.sewer || "").trim();
+    if (sewer && S.dev[c] && date === today() && sewer !== (d.sewer || "")){ put("devices", c, {sewer}, true); S.dev[c] = Object.assign({}, d, {sewer}); }   // nhớ người may cho máy
+    const ent = {sewer, devName: d.name || (old && old.devName) || "", group: d.group || (old && old.group) || "", area: d.area || (old && old.area) || "", lines: out, qty: tq, b2: tb,
       by: who.id, byName: who.name, at: now, firstAt: old ? (old.firstAt || old.at) : now, firstBy: old ? (old.firstBy || old.byName) : who.name,
       edits: old ? (old.edits || []).concat([{at: now, by: who.name}]).slice(-10) : []};
     dayPut(date, c, ent); closePop(); DP = null;
@@ -1788,16 +1792,16 @@ function dayCard(m){
   // theo mã hàng / theo máy
   const tbl = (title, g, lab) => '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T(title)) + '</div><div class="scroll"><table class="t"><thead><tr><th>' + esc(T(lab)) + '</th><th class="n">' + esc(T("Sản lượng")) + '</th><th class="n">' + esc(T("Loại 2")) + '</th><th class="n">' + esc(T("Tỷ lệ loại 2")) + '</th></tr></thead><tbody>' +
     Object.entries(g).sort((a, b) => b[1].b - a[1].b || b[1].q - a[1].q).map(([k, o]) => '<tr><td>' + k + '</td><td class="n">' + esc(qtyText(o.q)) + '</td><td class="n"' + (o.b ? ' style="color:var(--r);font-weight:700"' : "") + '>' + esc(qtyText(o.b)) + '</td><td class="n">' + rateHtml(o.q, o.b) + '</td></tr>').join("") + '</tbody></table></div></div>';
-  const gp = grp(x => esc(x.l.product)), gm = grp(x => '<span class="code">' + esc(x.c) + '</span> ' + esc(x.e.devName || devName(x.c)));
-  h += tbl("Theo mã hàng", gp, "Mã hàng") + tbl("Theo máy", gm, "Máy") + '</div>';
+  const gs = grp(x => esc(x.e.sewer || "–")), gp = grp(x => esc(x.l.product || "–")), gm = grp(x => '<span class="code">' + esc(x.c) + '</span> ' + esc(x.e.devName || devName(x.c)));
+  h += tbl("Theo người may", gs, "Người may") + tbl("Theo mã hàng", gp, "Mã hàng") + tbl("Theo máy", gm, "Máy") + '</div>';
   return h;
 }
 /* Xuất CSV báo cáo cuối ngày của tháng (mỗi dòng = 1 máy × 1 mã hàng × 1 ngày) */
 async function dayCsv(m){
   const D = m === ym() && SYNC.full ? Object.keys(DB0).filter(k => DB0[k].type === TYPES.daily && DB0[k].month === m).map(k => Object.assign({_id: k.slice(TYPES.daily.length + 1)}, DB0[k])) : docs("daily", await Q("daily", "month", m).get());
   const L = dayLines(D).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.c < b.c ? -1 : a.c > b.c ? 1 : 0);
-  csvDown("bao-cao-cuoi-ngay-" + m + ".csv", [[T("Ngày"), T("Mã máy"), T("Tên máy"), T("Mã hàng"), T("Sản lượng (đôi)"), T("Sản lượng (tá – đôi)"), T("Hàng loại 2 (đôi)"), T("Hàng loại 2 (tá – đôi)"), T("Tỷ lệ loại 2 (%)"), T("Chi tiết loại 2"), T("Người nhập"), T("Giờ nhập")]]
-    .concat(L.map(x => [fmtD(x.date), x.c, x.e.devName || devName(x.c), x.l.product, x.l.qty, qtyText(x.l.qty), x.l.b2, qtyText(x.l.b2), x.l.qty ? Math.round(x.l.b2 * 1000 / x.l.qty) / 10 : "", defText(x.l), x.e.byName || "", fmtDT(x.e.at)])));
+  csvDown("bao-cao-cuoi-ngay-" + m + ".csv", [[T("Ngày"), T("Mã máy"), T("Tên máy"), T("Người may"), T("Mã hàng"), T("Sản lượng (đôi)"), T("Sản lượng (tá – đôi)"), T("Hàng loại 2 (đôi)"), T("Hàng loại 2 (tá – đôi)"), T("Tỷ lệ loại 2 (%)"), T("Chi tiết loại 2"), T("Người nhập"), T("Giờ nhập")]]
+    .concat(L.map(x => [fmtD(x.date), x.c, x.e.devName || devName(x.c), x.e.sewer || "", x.l.product, x.l.qty, qtyText(x.l.qty), x.l.b2, qtyText(x.l.b2), x.l.qty ? Math.round(x.l.b2 * 1000 / x.l.qty) / 10 : "", defText(x.l), x.e.byName || "", fmtDT(x.e.at)])));
   toast(T("Đã xuất file"), "ok");
 }
 
@@ -1827,7 +1831,7 @@ VIEWS.knit = {wide: true, live: true, title: () => T("Máy may"), html(){
     if (!canSetProd() && !isAdmin()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Chỉ tài khoản Quản đốc mới thêm được mã hàng. Bạn đang đăng nhập: {r}.", {r: T(ROLES[S.user.role] || "")})) + '</div>';
   }
   const nOff = Object.values(S.dev).filter(d => d.status === "off").length;
-  h += '<div class="row" style="gap:8px;align-items:center"><div class="search lc f" style="margin:0">' + ic("search") + '<input id="knq" placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.q || "") + '" oninput="F.q=this.value;drawKnit()"></div>' +
+  h += '<div class="row" style="gap:8px;align-items:center"><div class="search lc f" style="margin:0">' + ic("search") + '<input id="knq" placeholder="' + esc(T("Tìm mã máy, tên máy, người may")) + '" value="' + esc(F.q || "") + '" oninput="F.q=this.value;drawKnit()"></div>' +
     (nOff ? '<button class="fc' + (F.off ? " on" : "") + '" style="margin:0" onclick="F.off=!F.off;F.p=null;F.g=\'\';render(true)">' + esc(T("Ngừng dùng")) + ' <span>' + nOff + '</span></button>' : "") + '</div><div style="height:10px"></div>';
   // lọc theo nhóm máy (chỉ hiện khi có từ 2 nhóm trở lên)
   const gs = Array.from(new Set(all.map(d => d.group || ""))).filter(Boolean).sort();
@@ -1931,7 +1935,7 @@ const NOPROD = "!none";   // khoá lọc cho máy "Không có mã hàng"
 const pKey = d => d.noProd ? NOPROD : (d.product || "");
 /* Danh sách ở tab Máy may: máy đang dùng (hoặc máy ngừng dùng khi bật lọc), có tìm kiếm */
 function knList(noQ){ const q = noQ ? "" : String(F.q || "").trim().toLowerCase();
-  return Object.values(S.dev).filter(d => (F.off ? d.status === "off" : d.status !== "off") && (!q || (d._id + " " + (d.name || "") + " " + (d.product || "") + " " + (d.area || "")).toLowerCase().indexOf(q) >= 0)).sort((a, b) => a._id < b._id ? -1 : 1); }
+  return Object.values(S.dev).filter(d => (F.off ? d.status === "off" : d.status !== "off") && (!q || (d._id + " " + (d.name || "") + " " + (d.sewer || "") + " " + (d.product || "") + " " + (d.area || "")).toLowerCase().indexOf(q) >= 0)).sort((a, b) => a._id < b._id ? -1 : 1); }
 function knFiltered(){ return knList().filter(d => (!F.g || d.group === F.g) && (F.p === null || pKey(d) === F.p)); }
 function drawKnit(){
   const el = $("#knlist"); if (!el) return;
@@ -1956,6 +1960,7 @@ function knitTile(d){
     '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
     '<div class="prodband' + (d.noProd ? " nop" : d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + (d.noProd ? "" : pSize(d.product)) + '">' + esc(d.noProd ? T("Không có mã hàng") : d.product || T("Chưa có")) + '</b></div>' + dayBand(d) +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
+    (d.sewer ? '<div class="dsew">' + ic("user") + esc(d.sewer) + '</div>' : "") +
     '<div class="dmeta">' + esc((d.product || d.noProd) && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div>' +
     (!pick && canManageDev() ? '<div class="dact"><button class="btn sm w" onclick="event.stopPropagation();go(\'devform\',{code:\'' + d._id + '\'})">' + ic("edit") + esc(T("Sửa")) + '</button>' +
       '<button class="btn sm w" style="color:var(--r)" onclick="event.stopPropagation();devDelPop(\'' + d._id + '\')" aria-label="' + esc(T("Xoá")) + '">' + ic("trash") + esc(T("Xoá")) + '</button></div>' : "") + '</div>';
@@ -1997,7 +2002,7 @@ VIEWS.devices = {wide: true, live: true, mgr: true, title: () => T("Thiết bị
   const L = filteredDevs();
   let h = '<div class="btns" style="margin-bottom:10px">' + (canManageDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "") +
     (isDirector() ? "" : '<button class="btn w" onclick="F.selMode=!F.selMode;render(true)">' + ic("print") + (F.selMode ? T("Huỷ chọn") : T("In tem QR")) + '</button>') + '</div>';
-  h += '<div class="search lc">' + ic("search") + '<input id="dq" placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDevs()"></div>';
+  h += '<div class="search lc">' + ic("search") + '<input id="dq" placeholder="' + esc(T("Tìm mã máy, tên máy, người may")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDevs()"></div>';
   h += '<div class="grid3"><select onchange="F.grp=this.value;drawDevs()"><option value="">' + esc(T("Tất cả nhóm máy")) + '</option>' + (S.cfg.groups || []).map(g => '<option' + (F.grp === g ? " selected" : "") + '>' + esc(g) + '</option>').join("") + '</select><select onchange="F.area=this.value;drawDevs()"><option value="">' + esc(T("Tất cả khu vực")) + '</option>' + areasAll().map(a => '<option' + (F.area === a ? " selected" : "") + '>' + esc(a) + '</option>').join("") + '</select>' +
     '<select onchange="F.st=this.value;drawDevs()"><option value="">' + esc(T("Mọi trạng thái")) + '</option>' + [["ok", "Hoạt động"], ["broken", "Đang hỏng"], ["off", "Ngừng dùng"]].map(([k, v]) => '<option value="' + k + '"' + (F.st === k ? " selected" : "") + '>' + esc(T(v)) + '</option>').join("") + '</select></div>';
   if (F.selMode) h += '<div class="hl" style="margin-top:10px"><div class="row"><div class="f">' + esc(T("Chạm để chọn máy cần in tem")) + ' – <b id="selN">' + Object.keys(F.sel).filter(k => F.sel[k]).length + '</b></div><button class="btn sm gh" onclick="selAll()">' + esc(T("Chọn tất cả")) + '</button></div>' +
@@ -2082,6 +2087,7 @@ VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiế
   h += fld("fname", "Tên thiết bị", d.name, {req: 1});
   h += '<div class="lc"><label>' + esc(T("Khu vực")) + '</label><input id="farea" list="dl_area" value="' + esc(d.area || "") + '"></div>';
   h += '<datalist id="dl_area">' + areasAll().map(a => '<option value="' + esc(a) + '">').join("") + '</datalist>';
+  h += '<div class="lc"><label>' + esc(T("Người may")) + '</label><input id="fsewer" list="dl_sew" autocomplete="off" value="' + esc(d.sewer || "") + '">' + sewList() + '</div>';
   h += '<div class="grid2">' + fld("fmaker", "Hãng", d.maker) + fld("fmodel", "Model", d.model) + '</div>';
   h += fld("fsince", "Ngày đưa vào sử dụng", d.since, {attr: ' type="date"'});
   if (e) h += '<div class="ck ' + (F.status === "off" ? "on" : "") + '" onclick="F.status=F.status===\'off\'?\'ok\':\'off\';this.classList.toggle(\'on\',F.status===\'off\')"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Ngừng sử dụng máy này (ẩn khỏi danh sách máy may)")) + '</span></div>';
@@ -2104,7 +2110,7 @@ async function saveDev(){
   if (!group){ toast(T("Chọn nhóm máy"), "err"); return; }
   if (isKnit(group) && !gauge){ toast(T("Chọn loại máy (7G–15G)"), "err"); return; }
   if (!name){ toast(T("Nhập tên thiết bị"), "err"); return; }
-  const d = {group, gauge, name, area: $("#farea").value.trim(), maker: $("#fmaker").value.trim(), model: $("#fmodel").value.trim(),
+  const d = {group, gauge, name, area: $("#farea").value.trim(), sewer: $("#fsewer").value.trim(), maker: $("#fmaker").value.trim(), model: $("#fmodel").value.trim(),
     since: $("#fsince").value, status: F.status || "ok", note: $("#fnote").value.trim()};
   if (editing){ put("devices", code, d, true); savedMsg(); back(); return; }
   const auto = code === F.auto;
@@ -2206,7 +2212,7 @@ VIEWS.planform = {mgr: true, noDir: true, title: () => V.p.id ? T("Sửa kế ho
     const gs = Array.from(new Set(pfDevs("").map(d => d.group).filter(Boolean)));
     let pk = '<div class="hl knbar"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt">' + esc(T("Chọn máy")) + ' <span class="kncount"><span id="pfN">0</span> ' + esc(T("máy")) + '</span></div>' +
       '<button class="btn sm gh" onclick="pfAll()">' + esc(T("Chọn tất cả")) + '</button><button class="btn sm w" onclick="F.sel={};drawPf()">' + esc(T("Bỏ chọn")) + '</button></div>' +
-      '<div class="search lc" style="margin:10px 0 6px">' + ic("search") + '<input placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.pq) + '" oninput="F.pq=this.value;drawPf()"></div>' +
+      '<div class="search lc" style="margin:10px 0 6px">' + ic("search") + '<input placeholder="' + esc(T("Tìm mã máy, tên máy, người may")) + '" value="' + esc(F.pq) + '" oninput="F.pq=this.value;drawPf()"></div>' +
       '<div class="fchips" id="pfgrp" style="margin:0">' + [["", T("Tất cả")]].concat(gs.map(g => [g, g])).map(([g, l]) => '<button class="fc' + (F.pg === g ? " on" : "") + '" data-g="' + esc(g) + '" onclick="F.pg=this.dataset.g;drawPf()">' + esc(l) + ' <span>' + pfDevs(g).length + '</span></button>').join("") + '</div></div>';
     pk += '<div id="pfgrid" style="margin-bottom:16px"></div>';
     h = pk + h;   // chọn máy nằm trên cùng
@@ -2756,6 +2762,11 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Người may": "縫製者",
+"Tên người may máy này": "この機械の縫製者名",
+"Theo người may": "縫製者別",
+"Tìm mã máy, tên máy, người may, mã hàng": "機械コード・機械名・縫製者・品番で検索",
+"Tìm mã máy, tên máy, người may": "機械コード・機械名・縫製者で検索",
 "Bấm Thêm thiết bị để thêm máy. Admin có thể chép máy may từ app Bảo trì: Tài khoản & cài đặt → Nhập dữ liệu từ app Bảo trì.": "「設備追加」で機械を追加します。管理者は保全アプリからミシンをコピーできます：アカウントと設定 → 保全アプリからデータ取込。",
 "Quản lý máy may": "ミシン管理",
 "Máy may": "ミシン",
