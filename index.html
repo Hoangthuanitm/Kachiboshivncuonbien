@@ -336,7 +336,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "16/11/2026 09:55";
+const VERSION = "16/11/2026 10:15";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const SRC_COLLECTION = "kachiboshibaotrithietbi";     // app Bảo trì (chỉ dùng khi nhập dữ liệu máy may lần đầu)
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
@@ -687,7 +687,7 @@ function go(view, p, replace){
 }
 function back(){ ((history.state && history.state.d) || 0) > 0 ? history.back() : go("home", {}, true); }
 const NAV_W = [["home","home","Trang chủ"],["knit","sew","Máy may"],["daily","list","Cuối ngày"],["incidents","alert","Sự cố"],["me","user","Tôi"]];
-const NAV_M = [["home","home","Trang chủ"],["knit","sew","Máy may"],["daily","list","Cuối ngày"],["devices","box","Thiết bị"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
+const NAV_M = [["home","home","Trang chủ"],["knit","sew","Máy may"],["daily","list","Cuối ngày"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
 window.addEventListener("popstate", e => {
   if (SCAN.on){ closeScan(true); return; }
   if ($(".lb")){ $(".lb").remove(); return; }
@@ -1907,18 +1907,28 @@ const knitDevs = () => Object.values(S.dev).filter(d => d.status !== "off").sort
 const canSetProd = () => S.user.role === "manager";
 VIEWS.knit = {wide: true, live: true, title: () => T("Máy may"), html(){
   if (!F.kn) F = {kn: 1, sel: {}, mode: false, g: "", p: null};
-  const all = knitDevs();
-  if (!all.length){
+  const all = knList(true);
+  if (!Object.keys(S.dev).length){
     if (!S.loaded.dev) return '<div class="empty"><div class="spin" style="margin:auto"></div></div>';
-    return empty("sew", T("Chưa có máy may nào.")) + '<div class="hl">' + esc(T("Thêm máy trong Thiết bị → Thêm thiết bị. Admin có thể chép máy may từ app Bảo trì: Tài khoản & cài đặt → Nhập dữ liệu từ app Bảo trì.")) + '</div>' +
-      (isMgr() ? '<button class="btn" onclick="go(\'devices\')">' + ic("box") + T("Đi tới Thiết bị") + '</button>' : "");
+    return empty("sew", T("Chưa có máy may nào.")) + '<div class="hl">' + esc(T("Bấm Thêm thiết bị để thêm máy. Admin có thể chép máy may từ app Bảo trì: Tài khoản & cài đặt → Nhập dữ liệu từ app Bảo trì.")) + '</div>' +
+      (canManageDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "");
   }
   let h = "";
-  if (!canSetProd()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Chỉ tài khoản Quản đốc mới thêm được mã hàng. Bạn đang đăng nhập: {r}.", {r: T(ROLES[S.user.role] || "")})) + '</div>';
-  if (canSetProd() && !F.cmode) h += F.mode ? '<div class="hl knbar" id="knpanel">' + knPanel() + '</div>'
-    : '<button class="btn" style="margin-bottom:12px" onclick="F.mode=true;F.prod=\'\';render(true)">' + ic("plus") + T("Thêm mã hàng") + '</button>';
-  if (canDaily() && !F.mode) h += '<button class="btn w" style="margin-bottom:12px" onclick="openScan(\'day\')">' + ic("qr") + T("Quét QR nhập báo cáo cuối ngày") + '</button>';
-  if (F.cmode) h += '<div class="b" style="font-size:18px;margin:2px 2px 8px">' + esc(T("Cập nhật sản lượng máy đan")) + '</div>';
+  if (F.pmode) h += '<div class="hl knbar" id="knpanel"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt f">' + ic("print") + ' ' + esc(T("Chạm để chọn máy cần in tem")) + ' <span class="kncount"><span id="knN">0</span> ' + esc(T("máy")) + '</span></div>' +
+      '<button class="btn sm gh" onclick="knSelAll()">' + esc(T("Chọn tất cả")) + '</button><button class="btn sm w" onclick="F.pmode=false;F.sel={};render(true)">' + esc(T("Huỷ")) + '</button></div>' +
+      '<button class="btn" style="margin-top:10px" onclick="goLabels()">' + ic("print") + T("Xem & in tem") + '</button></div>';
+  else if (F.mode) h += '<div class="hl knbar" id="knpanel">' + knPanel() + '</div>';
+  else {
+    const B = (canSetProd() ? '<button class="btn" onclick="F.mode=true;F.prod=\'\';F.sel={};render(true)">' + ic("plus") + T("Thêm mã hàng") + '</button>' : "") +
+      (canManageDev() ? '<button class="btn w" onclick="go(\'devform\')">' + ic("box") + T("Thêm thiết bị") + '</button>' : "") +
+      (isDirector() ? "" : '<button class="btn w" onclick="F.pmode=true;F.sel={};render(true)">' + ic("print") + T("In tem QR") + '</button>');
+    if (B) h += '<div class="btns" style="margin-bottom:10px">' + B + '</div>';
+    if (canDaily()) h += '<button class="btn w" style="margin-bottom:12px" onclick="openScan(\'day\')">' + ic("qr") + T("Quét QR nhập báo cáo cuối ngày") + '</button>';
+    if (!canSetProd() && !isAdmin()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Chỉ tài khoản Quản đốc mới thêm được mã hàng. Bạn đang đăng nhập: {r}.", {r: T(ROLES[S.user.role] || "")})) + '</div>';
+  }
+  const nOff = Object.values(S.dev).filter(d => d.status === "off").length;
+  h += '<div class="row" style="gap:8px;align-items:center"><div class="search lc f" style="margin:0">' + ic("search") + '<input id="knq" placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.q || "") + '" oninput="F.q=this.value;drawKnit()"></div>' +
+    (nOff ? '<button class="fc' + (F.off ? " on" : "") + '" style="margin:0" onclick="F.off=!F.off;F.p=null;F.g=\'\';render(true)">' + esc(T("Ngừng dùng")) + ' <span>' + nOff + '</span></button>' : "") + '</div><div style="height:10px"></div>';
   // lọc theo nhóm máy (chỉ hiện khi có từ 2 nhóm trở lên)
   const gs = Array.from(new Set(all.map(d => d.group || ""))).filter(Boolean).sort();
   if (gs.length > 1) h += '<div class="fchips" id="kngauge">' + [["", T("Tất cả")]].concat(gs.map(g => [g, g])).map(([g, l]) => '<button class="fc' + (F.g === g ? " on" : "") + '" onclick="F.g=\'' + esc(g) + '\';drawKnit()">' + esc(l) + ' <span>' + all.filter(d => !g || d.group === g).length + '</span></button>').join("") + '</div>';
@@ -2019,12 +2029,15 @@ function cntSave0(E){
 }
 const NOPROD = "!none";   // khoá lọc cho máy "Không có mã hàng"
 const pKey = d => d.noProd ? NOPROD : (d.product || "");
-function knFiltered(){ return knitDevs().filter(d => (!F.g || d.group === F.g) && (F.p === null || pKey(d) === F.p)); }
+/* Danh sách ở tab Máy may: máy đang dùng (hoặc máy ngừng dùng khi bật lọc), có tìm kiếm */
+function knList(noQ){ const q = noQ ? "" : String(F.q || "").trim().toLowerCase();
+  return Object.values(S.dev).filter(d => (F.off ? d.status === "off" : d.status !== "off") && (!q || (d._id + " " + (d.name || "") + " " + (d.product || "") + " " + (d.area || "")).toLowerCase().indexOf(q) >= 0)).sort((a, b) => a._id < b._id ? -1 : 1); }
+function knFiltered(){ return knList().filter(d => (!F.g || d.group === F.g) && (F.p === null || pKey(d) === F.p)); }
 function drawKnit(){
   const el = $("#knlist"); if (!el) return;
   document.querySelectorAll("#kngauge .fc").forEach(b => b.classList.toggle("on", b.getAttribute("onclick").indexOf("F.g='" + F.g + "'") >= 0));
   // tóm tắt theo mã hàng (bấm để lọc)
-  const base = knitDevs().filter(d => !F.g || d.group === F.g), cnt = {};
+  const base = knList().filter(d => !F.g || d.group === F.g), cnt = {};
   base.forEach(d => { const k = pKey(d); cnt[k] = (cnt[k] || 0) + 1; });
   $("#knsum").innerHTML = '<div class="mu sm" style="margin:2px 2px 6px">' + esc(T("Mã hàng đang chạy")) + ':</div><div class="fchips">' +
     Object.entries(cnt).sort((a, b) => (a[0] && a[0] !== NOPROD ? 0 : a[0] ? 1 : 2) - (b[0] && b[0] !== NOPROD ? 0 : b[0] ? 1 : 2) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (p === NOPROD ? " nop" : "") + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p === NOPROD ? T("Không có mã hàng") : p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
@@ -2036,14 +2049,16 @@ function drawKnit(){
 }
 const pSize = p => !p ? "" : p.length > 22 ? "xs" : p.length > 13 ? "sm" : "";   // mã dài: chữ nhỏ lại để không bị cắt
 function knitTile(d){
-  const s = devState(d), k = s[2], on = F.mode && F.sel[d._id];
-  return '<div class="dt kt ' + k + (on ? " picked" : "") + '" onclick="' + (F.mode ? "F.sel['" + d._id + "']=!F.sel['" + d._id + "'];drawKnit()" : "go('device',{code:'" + d._id + "'})") + '">' +
-    (F.mode ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
+  const pick = F.mode || F.pmode, s = devState(d), k = s[2], on = pick && F.sel[d._id];
+  return '<div class="dt kt ' + k + (on ? " picked" : "") + '" onclick="' + (pick ? "F.sel['" + d._id + "']=!F.sel['" + d._id + "'];drawKnit()" : "go('device',{code:'" + d._id + "'})") + '">' +
+    (pick ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
     '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
     '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
     '<div class="prodband' + (d.noProd ? " nop" : d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + (d.noProd ? "" : pSize(d.product)) + '">' + esc(d.noProd ? T("Không có mã hàng") : d.product || T("Chưa có")) + '</b></div>' + dayBand(d) +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
-    '<div class="dmeta">' + esc((d.product || d.noProd) && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div></div>';
+    '<div class="dmeta">' + esc((d.product || d.noProd) && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div>' +
+    (!pick && canManageDev() ? '<div class="dact"><button class="btn sm w" onclick="event.stopPropagation();go(\'devform\',{code:\'' + d._id + '\'})">' + ic("edit") + esc(T("Sửa")) + '</button>' +
+      '<button class="btn sm w" style="color:var(--r)" onclick="event.stopPropagation();devDelPop(\'' + d._id + '\')" aria-label="' + esc(T("Xoá")) + '">' + ic("trash") + esc(T("Xoá")) + '</button></div>' : "") + '</div>';
 }
 /* Bảng thêm mã hàng: bước 1 chọn máy (chạm vào ô), bước 2 chọn mã hàng, rồi lưu */
 function knPanel(){
@@ -2139,7 +2154,7 @@ async function devDelGo(c){
     await withTimeout(Promise.all([delDoc("devices", c)].concat(plans.map(p => delDoc("plans", p._id)))), 15000);
     delete S.dev[c]; plans.forEach(p => delete S.plans[p._id]);
     closePop(); toast(T("Đã xoá thiết bị {c}", {c}), "ok");
-    if (V.view === "devices") render(true); else go("devices", {}, true);
+    if (V.view === "knit") render(true); else go("knit", {}, true);
   } catch(e){ err(T(e && e.code === "permission-denied" ? "Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules." : "Chưa xoá được. Kiểm tra mạng rồi thử lại.")); }
   finally { busy(false); }
 }
@@ -2338,7 +2353,7 @@ VIEWS.report = {wide: true, mgr: true, title: () => T("Báo cáo"), html(){
   const nBrk = act.filter(d => devState(d)[2] === "broken").length;
   let h = '<div class="lc" style="margin-bottom:4px"><label>' + esc(T("Tháng báo cáo")) + '</label><div class="row"><div class="f"><input id="xm" type="month" value="' + F.repM + '" max="' + ym() + '" onchange="if(this.value){F.repM=this.value;render(true)}"></div></div></div>';
   h += '<h3>' + esc(T("Thiết bị (hiện tại)")) + '</h3><div class="stats">' +
-    stat(act.length, T("Tổng số máy"), "", "go('devices')") +
+    stat(act.length, T("Tổng số máy"), "", "go('knit')") +
     stat(act.length - nBrk, T("Đang chạy"), "var(--g)") +
     stat(nBrk, T("Đang hỏng"), nBrk ? "var(--r)" : "", "go('incidents')") +
     stat(live.length - act.length, T("Ngừng dùng")) + '</div>';
@@ -2503,7 +2518,7 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
   return '<div class="menu">' + userCard() +
     m("users", "Tài khoản", "go('accounts')", T("{n} tài khoản", {n: Object.values(S.acc).filter(a => isAdmin() || a.role === "worker").length})) +
-    m("print", "In tem QR", "F={dv:1,q:'',area:'',st:'',selMode:true,sel:{}};go('devices')") +
+    m("print", "In tem QR", "F={kn:1,pmode:true,sel:{},mode:false,g:'',p:null};go('knit')") +
     m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
     m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
     m("sliders", "Cài đặt danh mục", "go('settings')") +
@@ -2842,6 +2857,7 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Bấm Thêm thiết bị để thêm máy. Admin có thể chép máy may từ app Bảo trì: Tài khoản & cài đặt → Nhập dữ liệu từ app Bảo trì.": "「設備追加」で機械を追加します。管理者は保全アプリからミシンをコピーできます：アカウントと設定 → 保全アプリからデータ取込。",
 "Quản lý máy may": "ミシン管理",
 "Máy may": "ミシン",
 "Cuối ngày": "日報",
