@@ -336,9 +336,8 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "16/11/2026 10:15";
+const VERSION = "16/11/2026 10:20";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
-const SRC_COLLECTION = "kachiboshibaotrithietbi";     // app Bảo trì (chỉ dùng khi nhập dữ liệu máy may lần đầu)
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
   authDomain: "kachiboshivn.firebaseapp.com",
@@ -347,17 +346,6 @@ const firebaseConfig = {   // project kachiboshivn (app Máy may)
   messagingSenderId: "601625192225",
   appId: "1:601625192225:web:c67add0ac64e88b97b4060",
   measurementId: "G-S1B8JVNSF9"
-};
-/* Project của app Bảo trì: chỉ dùng để chép dữ liệu máy may sang (chỉ đọc) */
-const SRC_CONFIG = {
-  apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
-  authDomain: "history-testnghethu1-6.firebaseapp.com",
-  databaseURL: "https://history-testnghethu1-6-default-rtdb.firebaseio.com",
-  projectId: "history-testnghethu1-6",
-  storageBucket: "history-testnghethu1-6.firebasestorage.app",
-  messagingSenderId: "219184557370",
-  appId: "1:219184557370:web:9622f4c8b05261ab833403",
-  measurementId: "G-CC9CQJHZ69"
 };
 const LOGO = (document.querySelector(".boot img") || {}).src || "";   // dùng lại ảnh logo đã có trong màn hình chờ, không nhúng 2 lần
 const LIB = {
@@ -1813,94 +1801,6 @@ async function dayCsv(m){
   toast(T("Đã xuất file"), "ok");
 }
 
-/* Firestore của app Bảo trì (project khác) – mở 1 lần khi cần */
-let SRC_FS = null;
-function srcFS(){ if (!SRC_FS){ let a; try { a = firebase.app("src"); } catch(e){ a = firebase.initializeApp(SRC_CONFIG, "src"); } SRC_FS = a.firestore(); } return SRC_FS; }
-/* ================== NHẬP DỮ LIỆU MÁY MAY TỪ APP BẢO TRÌ (chỉ Admin, làm 1 lần) ==================
-   Đọc collection của app Bảo trì (project Firebase của app Bảo trì, chỉ đọc), chép sang collection của app này:
-   máy thuộc nhóm đã chọn + sự cố + linh kiện đã thay + ảnh của các máy đó, tài khoản, danh mục (mã hàng, linh kiện, bộ phận, khu vực).
-   Không xoá gì bên app Bảo trì. Chép lại lần nữa thì ghi đè đúng các bản ghi đó (không bị nhân đôi). */
-VIEWS.import = {mgr: true, noDir: true, title: () => T("Nhập dữ liệu từ app Bảo trì"), html(){
-  if (!isAdmin()) return empty("down", T("Không có quyền"));
-  if (!F.im) F = {im: 1, src: SRC_COLLECTION, groups: null, sel: {}, acc: true, cfg: true, log: "", done: false};
-  let h = '<div class="hl">' + esc(T("Chép máy may và dữ liệu liên quan từ app Bảo trì sang app này. Chỉ đọc bên app Bảo trì, không xoá gì bên đó. Làm 1 lần khi bắt đầu dùng app.")) + '</div>';
-  h += '<div class="lc"><label>' + esc(T("Collection của app Bảo trì")) + '</label><input id="imsrc" value="' + esc(F.src) + '" oninput="F.src=this.value.trim()"></div>';
-  h += '<button class="btn w" onclick="imScan()">' + ic("search") + T("Bước 1: Kiểm tra dữ liệu bên app Bảo trì") + '</button>';
-  if (F.groups){
-    h += '<div class="card" style="margin-top:12px"><div class="b" style="margin-bottom:6px">' + esc(T("Chọn nhóm máy cần chép")) + '</div>' +
-      Object.entries(F.groups).sort((a, b) => b[1] - a[1]).map(([g, n]) => '<div class="ck imgrp ' + (F.sel[g] ? "on" : "") + '" onclick="F.sel[\'' + esc(g).replace(/'/g, "\\'") + '\']=!F.sel[\'' + esc(g).replace(/'/g, "\\'") + '\'];render(true)"><span class="bx">' + ic("ok") + '</span><span class="f">' + esc(g || T("(Chưa phân nhóm)")) + '</span><b>' + n + '</b></div>').join("") +
-      '<div class="ck ' + (F.acc ? "on" : "") + '" style="margin-top:10px" onclick="F.acc=!F.acc;render(true)"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Chép tài khoản (giữ nguyên mã NV và mã PIN; tài khoản đã có ở app này thì giữ nguyên)")) + '</span></div>' +
-      '<div class="ck ' + (F.cfg ? "on" : "") + '" onclick="F.cfg=!F.cfg;render(true)"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Chép danh mục: mã hàng, linh kiện, bộ phận, khu vực")) + '</span></div></div>';
-    const n = Object.keys(F.sel).filter(g => F.sel[g]).reduce((a, g) => a + (F.groups[g] || 0), 0);
-    h += '<button class="btn" ' + (n ? "" : "disabled") + ' onclick="imRun()">' + ic("down") + T("Bước 2: Chép {n} máy và dữ liệu liên quan", {n}) + '</button>';
-  }
-  h += '<div class="imlog" id="imlog"' + (F.log ? "" : ' style="display:none"') + '>' + esc(F.log) + '</div>';
-  if (F.done) h += '<button class="btn w" style="margin-top:10px" onclick="go(\'knit\')">' + ic("sew") + T("Xem danh sách máy may") + '</button>';
-  return h;
-}};
-function imLog(t){ F.log = (F.log ? F.log + "\n" : "") + t; const e = $("#imlog"); if (e){ e.style.display = ""; e.textContent = F.log; e.scrollTop = e.scrollHeight; } }
-async function imScan(){
-  if (!isAdmin()) return;
-  if (!F.src){ toast(T("Collection nguồn không hợp lệ"), "err"); return; }
-  busy(true);
-  try {
-    const sn = await withTimeout(srcFS().collection(F.src).where("type", "==", "dev").get(), 30000);
-    F.srcDev = sn.docs.map(d => ({id: d.id, x: d.data()}));
-    F.groups = {}; F.srcDev.forEach(d => { const g = d.x.group || ""; F.groups[g] = (F.groups[g] || 0) + 1; });
-    F.sel = {}; Object.keys(F.groups).forEach(g => { if (/m[áa]y\s*may/i.test(g.normalize("NFC"))) F.sel[g] = true; });
-    F.log = ""; imLog(T("Tìm thấy {n} máy bên app Bảo trì ({r} lượt đọc).", {n: F.srcDev.length, r: Math.max(1, F.srcDev.length)}));
-    render(true);
-  } catch(e){ onErr(e); imLog(T("Lỗi: {e}", {e: (e && (e.code || e.message)) || e})); }
-  finally { busy(false); }
-}
-async function imRun(){
-  if (!isAdmin() || !F.srcDev) return;
-  const C = srcFS().collection(F.src), devs = F.srcDev.filter(d => F.sel[d.x.group || ""]);
-  if (!devs.length) return;
-  if (!confirm(T("Chép {n} máy cùng sự cố, linh kiện, ảnh của các máy đó sang app Máy may?", {n: devs.length}))) return;
-  busy(true); F.done = false;
-  const out = [], now = Date.now(), seen = new Set();
-  const add = (id, x) => { if (seen.has(id)) return; seen.add(id); out.push([id, x.type === "photo" ? x : Object.assign({}, x, {updatedAt: now})]); };
-  let reads = 0;
-  try {
-    devs.forEach(d => add(d.id, d.x));
-    const codes = devs.map(d => d.id.slice(4));
-    for (let i = 0; i < codes.length; i += 6){   // mỗi lần 6 máy chạy song song
-      const part = codes.slice(i, i + 6);
-      const res = await Promise.all(part.map(c => Promise.all(["inc", "part", "photo"].map(t => C.where("type", "==", t).where("devId", "==", c).get()))));
-      res.forEach(r => r.forEach(sn => { reads += Math.max(1, sn.docs.length); sn.docs.forEach(d => add(d.id, d.data())); }));
-      imLog(T("Đã đọc {a}/{b} máy…", {a: Math.min(i + 6, codes.length), b: codes.length}));
-    }
-    if (F.acc){
-      const sn = await C.where("type", "==", "acc").get(); reads += Math.max(1, sn.docs.length); let k = 0;
-      sn.docs.forEach(d => { if (!S.acc[d.id.slice(4)]){ add(d.id, d.data()); k++; } });
-      imLog(T("Tài khoản: chép {k}, giữ nguyên {s} tài khoản đã có.", {k, s: sn.docs.length - k}));
-    }
-    if (F.cfg){
-      const cf = await C.doc("config_main").get(); reads++;
-      if (cf.exists){ const x = cf.data(), u = {}, mg = (a, b) => Array.from(new Set((a || []).concat(b || [])));
-        ["products", "parts", "depts", "areas"].forEach(k => { if (Array.isArray(x[k])) u[k] = mg(S.cfg[k], x[k]); });
-        u.groups = mg(S.cfg.groups, Object.keys(F.sel).filter(g => F.sel[g] && g));
-        if (x.ja) u.ja = Object.assign({}, x.ja, S.cfg.ja || {});
-        put("config", "main", u, true); imLog(T("Đã gộp danh mục mã hàng, linh kiện, bộ phận, khu vực.")); }
-    }
-    const cnt = {}; out.forEach(([id, x]) => cnt[x.type] = (cnt[x.type] || 0) + 1);
-    imLog(T("Sẽ ghi {n} bản ghi: {d}", {n: out.length, d: Object.entries(cnt).map(([t, n]) => t + " " + n).join(", ")}));
-    let b = FS.batch(), n = 0, sz = 0, w = 0;
-    for (const [id, x] of out){
-      const z = JSON.stringify(x).length;
-      if (n && (n >= 300 || sz + z > 6e6)){ await withTimeout(b.commit(), 120000); w += n; imLog(T("Đã ghi {w}/{t}", {w, t: out.length})); b = FS.batch(); n = 0; sz = 0; }
-      b.set(COL.doc(id), x); n++; sz += z;
-    }
-    if (n){ await withTimeout(b.commit(), 120000); w += n; }
-    imLog(T("Xong: đã ghi {w} bản ghi ({r} lượt đọc bên app Bảo trì).", {w, r: reads}));
-    F.done = true; toast(T("Đã chép xong dữ liệu máy may"), "ok");
-    cacheClear(); Object.keys(HC).forEach(k => delete HC[k]); stopLive(); startLive(); render(true);
-  } catch(e){
-    onErr(e); imLog(T("Lỗi: {e}", {e: (e && (e.code || e.message)) || e}) + (e && e.code === "permission-denied" ? " — " + T("Firestore Rules cần cho phép đọc collection app Bảo trì và ghi collection {c}.", {c: COLLECTION}) : ""));
-  } finally { busy(false); }
-}
-
 /* ---- Thiết bị (quản lý) ---- */
 /* ---- Máy đan: xem mã hàng đang chạy, quản đốc chọn nhiều máy để đổi mã hàng ---- */
 const knitDevs = () => Object.values(S.dev).filter(d => d.status !== "off").sort((a, b) => a._id < b._id ? -1 : 1);   // app Máy may: mọi máy đang dùng
@@ -1910,7 +1810,7 @@ VIEWS.knit = {wide: true, live: true, title: () => T("Máy may"), html(){
   const all = knList(true);
   if (!Object.keys(S.dev).length){
     if (!S.loaded.dev) return '<div class="empty"><div class="spin" style="margin:auto"></div></div>';
-    return empty("sew", T("Chưa có máy may nào.")) + '<div class="hl">' + esc(T("Bấm Thêm thiết bị để thêm máy. Admin có thể chép máy may từ app Bảo trì: Tài khoản & cài đặt → Nhập dữ liệu từ app Bảo trì.")) + '</div>' +
+    return empty("sew", T("Chưa có máy may nào.")) + '<div class="hl">' + esc(T("Bấm Thêm thiết bị để thêm máy.")) + '</div>' +
       (canManageDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "");
   }
   let h = "";
@@ -2522,7 +2422,6 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
     m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
     m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
     m("sliders", "Cài đặt danh mục", "go('settings')") +
-    (isAdmin() ? m("down", "Nhập dữ liệu từ app Bảo trì", "go('import')", T("Chép máy may, sự cố, linh kiện, tài khoản")) : "") +
     (isAdmin() ? m("trash", "Xoá toàn bộ dữ liệu", "go('purge')", T("Chỉ Quản trị, cần mật khẩu")) : "") +
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
 }};
