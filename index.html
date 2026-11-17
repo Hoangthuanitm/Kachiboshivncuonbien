@@ -337,7 +337,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "16/11/2026 16:30";
+const VERSION = "17/11/2026 08:00";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -968,7 +968,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     '<dl class="info" style="margin-top:12px">' +
       (d.group ? '<dt>' + esc(T("Nhóm máy")) + '</dt><dd>' + esc(d.group) + '</dd>' : "") +
       (d.gauge ? '<dt>' + esc(T("Loại máy")) + '</dt><dd>' + esc(d.gauge) + '</dd>' : "") +
-      (true ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.noProd ? '<b class="nopt">' + esc(T("Không có mã hàng")) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
+      ((d.product || d.noProd) ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.noProd ? '<b class="nopt">' + esc(T("Không có mã hàng")) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
       (d.sewer ? '<dt>' + esc(T("Người may")) + '</dt><dd><b>' + esc(d.sewer) + '</b></dd>' : "") +
       (d.area ? '<dt>' + esc(T("Khu vực")) + '</dt><dd>' + esc(d.area) + '</dd>' : "") +
       ((d.maker || d.model) ? '<dt>' + esc(T("Hãng / Model")) + '</dt><dd>' + esc([d.maker, d.model].filter(Boolean).join(" / ")) + '</dd>' : "") +
@@ -1675,7 +1675,7 @@ function dayPop(c, date){
   const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov"; ov.onclick = ev => { if (ev.target === ov) closePop(); };
   const nm = (d && d.name) || (e && e.devName) || "";
   ov.innerHTML = '<div class="pbox" role="dialog" aria-modal="true"><div class="phd"><div class="f"><div class="pt">' + esc(T("Báo cáo cuối ngày")) + ' · <span class="code">' + esc(c) + '</span> ' + esc(nm) + '</div><div class="ps">' +
-    esc(T("Ngày {d}", {d: fmtD(date)})) + (d ? ' · ' + esc(T("Mã hàng đang chạy")) + ': ' + esc(d.noProd ? T("Không có mã hàng") : d.product || T("Chưa có")) : "") + '</div></div>' +
+    esc(T("Ngày {d}", {d: fmtD(date)})) + (d && (d.product || d.noProd) ? ' · ' + esc(T("Mã hàng đang chạy")) + ': ' + esc(d.noProd ? T("Không có mã hàng") : d.product) : "") + '</div></div>' +
     '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div><div class="pbd" id="dpbody"></div></div>';
   document.body.appendChild(ov); document.body.style.overflow = "hidden";
   dpDraw();
@@ -1943,8 +1943,9 @@ function drawKnit(){
   // tóm tắt theo mã hàng (bấm để lọc)
   const base = knList().filter(d => !F.g || d.group === F.g), cnt = {};
   base.forEach(d => { const k = pKey(d); cnt[k] = (cnt[k] || 0) + 1; });
-  $("#knsum").innerHTML = '<div class="mu sm" style="margin:2px 2px 6px">' + esc(T("Mã hàng đang chạy")) + ':</div><div class="fchips">' +
-    Object.entries(cnt).sort((a, b) => (a[0] && a[0] !== NOPROD ? 0 : a[0] ? 1 : 2) - (b[0] && b[0] !== NOPROD ? 0 : b[0] ? 1 : 2) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (p === NOPROD ? " nop" : "") + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p === NOPROD ? T("Không có mã hàng") : p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
+  const PE = Object.entries(cnt).filter(([p]) => p);   // máy chưa có mã hàng: không hiện
+  $("#knsum").innerHTML = !PE.length ? "" : '<div class="mu sm" style="margin:2px 2px 6px">' + esc(T("Mã hàng đang chạy")) + ':</div><div class="fchips">' +
+    PE.sort((a, b) => (a[0] && a[0] !== NOPROD ? 0 : a[0] ? 1 : 2) - (b[0] && b[0] !== NOPROD ? 0 : b[0] ? 1 : 2) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (p === NOPROD ? " nop" : "") + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p === NOPROD ? T("Không có mã hàng") : p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
   const L = knFiltered();
   if (F.cmode){ el.innerHTML = L.length ? cntPanel(L) : empty("knit", T("Không có máy phù hợp")); return; }
   el.innerHTML = L.length ? '<div class="dgrid">' + L.map(knitTile).join("") + '</div>' : empty("knit", T("Không có máy phù hợp"));
@@ -1958,7 +1959,7 @@ function knitTile(d){
     (pick ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
     '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
     '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
-    '<div class="prodband' + (d.noProd ? " nop" : d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + (d.noProd ? "" : pSize(d.product)) + '">' + esc(d.noProd ? T("Không có mã hàng") : d.product || T("Chưa có")) + '</b></div>' + dayBand(d) +
+    (d.product || d.noProd ? '<div class="prodband' + (d.noProd ? " nop" : "") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + (d.noProd ? "" : pSize(d.product)) + '">' + esc(d.noProd ? T("Không có mã hàng") : d.product) + '</b></div>' : "") + dayBand(d) +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
     (d.sewer ? '<div class="dsew">' + ic("user") + esc(d.sewer) + '</div>' : "") +
     '<div class="dmeta">' + esc((d.product || d.noProd) && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div>' +
@@ -2428,7 +2429,8 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
     m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
     m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
     m("sliders", "Cài đặt danh mục", "go('settings')") +
-    (isAdmin() ? m("trash", "Xoá toàn bộ dữ liệu", "go('purge')", T("Chỉ Quản trị, cần mật khẩu")) : "") +
+    (isAdmin() ? m("trash", "Xoá dữ liệu số lượng đã nhập", "F={};go('purge',{only:'daily'})", T("Xoá toàn bộ báo cáo cuối ngày (sản lượng, loại 2)")) : "") +
+    (isAdmin() ? m("trash", "Xoá toàn bộ dữ liệu", "F={};go('purge')", T("Chỉ Quản trị, cần mật khẩu")) : "") +
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
 }};
 VIEWS.me = {title: () => T("Tôi"), html(){
@@ -2503,11 +2505,12 @@ async function saveAcc(){
 /* ---- Xoá toàn bộ dữ liệu, trừ tài khoản (chỉ Quản trị, mật khẩu 112) ---- */
 const PURGE_PW = "112";
 const PURGE_KINDS = [["devices", "Thiết bị"], ["daily", "Báo cáo cuối ngày"], ["incidents", "Sự cố"], ["photos", "Ảnh"], ["parts", "Linh kiện đã thay"], ["prodlog", "Lịch sử mã hàng"], ["config", "Danh mục cài đặt (trở về mặc định)"]];
-VIEWS.purge = {mgr: true, noDir: true, title: () => T("Xoá toàn bộ dữ liệu"), html(){
+VIEWS.purge = {mgr: true, noDir: true, title: () => T(V.p.only ? "Xoá dữ liệu số lượng đã nhập" : "Xoá dữ liệu"), html(){
   if (!isAdmin()) return empty("trash", T("Không có quyền"));
-  if (!F.pg) F = {pg: 1, plan: null};
-  let h = '<div class="hl" style="background:var(--rl);color:var(--r);font-weight:600">' + esc(T("Xoá sạch toàn bộ dữ liệu của app, không khôi phục được. Nên xuất Excel trước khi xoá.")) + '</div>';
-  h += '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T("Sẽ xoá")) + '</div><ul style="margin:0 0 6px 18px;padding:0">' + PURGE_KINDS.map(([k, l]) => '<li>' + esc(T(l)) + '</li>').join("") + '</ul>' +
+  if (!F.pg) F = {pg: 1, plan: null, k: Object.fromEntries(PURGE_KINDS.map(([k]) => [k, !V.p.only || V.p.only === k]))};
+  let h = '<div class="hl" style="background:var(--rl);color:var(--r);font-weight:600">' + esc(T("Dữ liệu đã chọn sẽ bị xoá hẳn, không khôi phục được. Nên xuất Excel trước khi xoá.")) + '</div>';
+  h += '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T("Chọn dữ liệu cần xoá")) + '</div>' +
+    PURGE_KINDS.map(([k, l]) => '<div class="ck ' + (F.k[k] ? "on" : "") + '" onclick="F.k[\'' + k + '\']=!F.k[\'' + k + '\'];F.plan=null;render(true)"><span class="bx">' + ic("ok") + '</span><span>' + esc(T(l)) + '</span></div>').join("") +
     '<div class="b" style="color:var(--g2)">✔ ' + esc(T("Giữ lại: tất cả tài khoản")) + '</div></div>';
   h += '<button class="btn w" onclick="pgCheck()">' + ic("search") + T("Kiểm tra số lượng sẽ xoá") + '</button><div id="pgres" style="margin-top:12px"></div>';
   return h;
@@ -2516,16 +2519,17 @@ function pgShow(){
   const el = $("#pgres"); if (!el) return;
   if (!F.plan){ el.innerHTML = ""; return; }
   const P = F.plan, tot = Object.values(P).reduce((a, x) => a + x.length, 0);
-  el.innerHTML = '<div class="card"><dl class="info">' + PURGE_KINDS.map(([k, l]) => '<dt>' + esc(T(l)) + '</dt><dd><b>' + P[k].length + '</b></dd>').join("") + '</dl></div>' +
+  el.innerHTML = '<div class="card"><dl class="info">' + PURGE_KINDS.filter(([k]) => P[k]).map(([k, l]) => '<dt>' + esc(T(l)) + '</dt><dd><b>' + P[k].length + '</b></dd>').join("") + '</dl></div>' +
     (tot ? '<div class="lc"><label class="req">' + esc(T("Mật khẩu xoá")) + '</label><input id="pgpw" class="pin" type="password" inputmode="numeric" autocomplete="off"></div>' +
-      '<button class="btn r" onclick="pgRun()">' + ic("trash") + T("XOÁ TOÀN BỘ {n} BẢN GHI", {n: tot}) + '</button>' : empty("ok", T("Không còn dữ liệu nào để xoá.")));
+      '<button class="btn r" onclick="pgRun()">' + ic("trash") + T("XOÁ {n} BẢN GHI", {n: tot}) + '</button>' : empty("ok", T("Không còn dữ liệu nào để xoá.")));
 }
 async function pgCheck(){
   if (!isAdmin()) return;
   busy(true);
   try {
     const P = {};
-    for (const [k] of PURGE_KINDS) P[k] = (await Q(k).get()).docs.map(d => d.id);
+    for (const [k] of PURGE_KINDS) if (F.k[k]) P[k] = (await Q(k).get()).docs.map(d => d.id);
+    if (!Object.keys(P).length){ toast(T("Chưa chọn dữ liệu cần xoá"), "err"); return; }
     F.plan = P; pgShow();
   } catch(e){ onErr(e); } finally { busy(false); }
 }
@@ -2534,7 +2538,7 @@ async function pgRun(){
   const pw = ($("#pgpw") || {}).value || "";
   if (pw !== PURGE_PW){ toast(T("Sai mật khẩu xoá"), "err"); return; }
   const refs = []; Object.values(F.plan).forEach(ids => ids.forEach(id => refs.push(COL.doc(id))));
-  if (!confirm(T("Xoá vĩnh viễn TOÀN BỘ {n} bản ghi (trừ tài khoản)?", {n: refs.length}))) return;
+  if (!confirm(T("Xoá vĩnh viễn {n} bản ghi đã chọn (không khôi phục được)?", {n: refs.length}))) return;
   busy(true);
   try {
     for (let i = 0; i < refs.length; i += 400){ const b = FS.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await withTimeout(b.commit(), 60000); }
@@ -2762,6 +2766,13 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Xoá dữ liệu": "データ削除",
+"Dữ liệu đã chọn sẽ bị xoá hẳn, không khôi phục được. Nên xuất Excel trước khi xoá.": "選択したデータは完全に削除され、元に戻せません。削除前にExcelへ出力してください。",
+"Chọn dữ liệu cần xoá": "削除するデータを選択",
+"Chưa chọn dữ liệu cần xoá": "削除するデータが選択されていません",
+"Xoá vĩnh viễn {n} bản ghi đã chọn (không khôi phục được)?": "選択した{n}件を完全に削除しますか（元に戻せません）？",
+"Xoá dữ liệu số lượng đã nhập": "入力済みの数量データを削除",
+"Xoá toàn bộ báo cáo cuối ngày (sản lượng, loại 2)": "日報（生産数・B品）をすべて削除",
 "Người may": "縫製者",
 "Tên người may máy này": "この機械の縫製者名",
 "Theo người may": "縫製者別",
