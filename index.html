@@ -326,6 +326,24 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 .imgrp{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--bd)}
 .imlog{font:13px/1.5 ui-monospace,Menlo,monospace;background:#11221b;color:#cfe3d8;border-radius:12px;padding:10px 12px;max-height:260px;overflow:auto;white-space:pre-wrap;margin-top:10px}
 .dsew{display:flex;align-items:center;gap:4px;font-weight:700;color:var(--g2);font-size:14px;margin-top:2px}.dsew svg.i{width:15px;height:15px}
+.dphd{gap:10px}.dphd .lc{margin-bottom:12px}
+.dygrid{border:1px solid var(--bd);border-radius:14px;padding:10px 12px;margin-bottom:12px;background:#fafcfb}
+.dyh,.dyr{display:grid;grid-template-columns:minmax(120px,1.5fr) minmax(90px,1fr) 150px 150px minmax(110px,1.1fr) 38px;gap:8px;align-items:center}
+.dyh{font-weight:700;font-size:13px;color:var(--mu);padding:0 2px 6px}.dyh .req:after{content:" *";color:var(--r)}
+.dyr{padding:4px 0}.dyr.f:not(:nth-child(2)){border-top:2px dashed var(--bd);margin-top:6px;padding-top:10px}
+.dyr input,.dyr select{margin:0}.dyr.add{display:block;padding:2px 0 4px}
+.dyr .c45{text-align:left}.dyr .c45 .btn,.dygrid>.btn{display:inline-flex;width:auto;margin:0 6px 0 0}
+.dygrid .qin{flex-wrap:nowrap;gap:4px}.dygrid .qin input{width:50px;font-size:17px;padding-left:5px;padding-right:5px}.dygrid .qin span{font-size:13px}
+.dyr .c4 .qin input{background:var(--rl)}.dyr .c6 .btn{padding:6px;min-width:0}
+.dygrid .dysum{margin-top:4px}
+@media (max-width:699px){
+  .dyh{display:none}
+  .dyr{grid-template-columns:1fr 1fr 38px;row-gap:6px}
+  .dyr .c1{grid-column:1}.dyr .c2{grid-column:2 / span 2}.dyr .c3{grid-column:1 / -1}.dyr .c4{grid-column:1}.dyr .c5{grid-column:2}.dyr .c6{grid-column:3}
+  .dyr>div:empty{display:none}
+  .dyr>div[data-l]:not(:empty):before{content:attr(data-l);display:block;font-size:12px;font-weight:700;color:var(--mu);margin-bottom:3px}
+  .dyr .c45{text-align:left}
+}
 .rgrid{margin-top:14px}
 </style>
 </head>
@@ -337,7 +355,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "17/11/2026 08:00";
+const VERSION = "19/11/2026 10:30";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -1668,14 +1686,14 @@ function dayPop(c, date){
   date = date || today();
   const d = S.dev[c], e = dayEnt(date, c);
   if (!d && !e) return;
-  DP = {c, date, ro: !canDaily(), del: false, sewer: e ? (e.sewer || "") : ((d && d.sewer) || ""), lines: e ? e.lines.map(l => { const q = splitQ(l.qty);
+  DP = {c, date, ro: !canDaily(), del: false, sewer: e ? (e.sewer || "") : ((d && d.sewer) || ""), product: e ? ((e.lines[0] || {}).product || "") : (d && !d.noProd ? (d.product || "") : ""), lines: e ? e.lines.map(l => { const q = splitQ(l.qty);
     return {id: l.id || "l" + uid(), product: l.product || "", ta: q[0], doi: q[1], defs: (l.defects || []).map(x => { const b = splitQ(x.b2); return {ta: b[0], doi: b[1], cause: x.cause || ""}; })}; }) : [dpNew(d)]};
   if (!DP.lines.length) DP.lines = [dpNew(d)];
   closePop(); F.actId = ""; F.actPin = "";
   const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov"; ov.onclick = ev => { if (ev.target === ov) closePop(); };
   const nm = (d && d.name) || (e && e.devName) || "";
   ov.innerHTML = '<div class="pbox" role="dialog" aria-modal="true"><div class="phd"><div class="f"><div class="pt">' + esc(T("Báo cáo cuối ngày")) + ' · <span class="code">' + esc(c) + '</span> ' + esc(nm) + '</div><div class="ps">' +
-    esc(T("Ngày {d}", {d: fmtD(date)})) + (d && (d.product || d.noProd) ? ' · ' + esc(T("Mã hàng đang chạy")) + ': ' + esc(d.noProd ? T("Không có mã hàng") : d.product) : "") + '</div></div>' +
+    esc(T("Ngày {d}", {d: fmtD(date)})) + "" + '</div></div>' +
     '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div><div class="pbd" id="dpbody"></div></div>';
   document.body.appendChild(ov); document.body.style.overflow = "hidden";
   dpDraw();
@@ -1699,18 +1717,28 @@ function dpDraw(){
   }
   const C = S.cfg.defects || [], many = DP.lines.length > 1;
   let h = info;
-  h += '<div class="lc"><label>' + esc(T("Người may")) + '</label><input id="dpsew" list="dl_sew" autocomplete="off" placeholder="' + esc(T("Tên người may máy này")) + '" value="' + esc(DP.sewer) + '" oninput="DP.sewer=this.value">' + sewList() + '</div>';
-  h += DP.lines.map((l, i) => {
+  const PL = Array.from(new Set((S.cfg.products || []).concat(Object.values(S.dev).map(x => x.product).filter(Boolean))));
+  // 1 hàng: Người may · Mã hàng · Sản lượng thực tế · Hàng loại 2 · Nguyên nhân (thêm loại 2 thì thêm hàng bên dưới)
+  h += '<div class="dygrid"><div class="dyh">' + [T("Người may"), T("Mã hàng"), T("Sản lượng thực tế"), T("Hàng loại 2"), T("Nguyên nhân"), ""].map((x, k) => '<span' + (k === 2 ? ' class="req"' : "") + '>' + esc(x) + (k === 3 ? ' <small style="font-weight:400">' + esc(T("(nếu có)")) + '</small>' : "") + '</span>').join("") + '</div>';
+  DP.lines.forEach((l, i) => {
     const co = j => { const cur = l.defs[j].cause; return C.concat(cur && C.indexOf(cur) < 0 ? [cur] : []); };
-    return '<div class="dyl">' + (many ? '<div class="b" style="margin-bottom:4px">' + esc(T("Mã hàng")) + ': ' + esc(l.product || "–") + '</div>' : "") +
-      '<label class="dyll req" style="margin-top:0">' + esc(T("Sản lượng thực tế")) + '</label>' + qIn("DP.lines[" + i + "]", l, i) +
-      '<label class="dyll">' + esc(T("Hàng loại 2")) + ' <span class="mu sm" style="font-weight:400">' + esc(T("(không có thì để trống)")) + '</span></label>' +
-      l.defs.map((x, j) => '<div class="dyd">' + qIn("DP.lines[" + i + "].defs[" + j + "]", x, i) +
-        '<select onchange="DP.lines[' + i + '].defs[' + j + '].cause=this.value"><option value="">' + esc(T("— Nguyên nhân —")) + '</option>' + co(j).map(o => '<option' + (o === x.cause ? " selected" : "") + '>' + esc(o) + '</option>').join("") + '</select>' +
-        '<button class="btn sm w" onclick="dpDefRm(' + i + ',' + j + ')" aria-label="' + esc(T("Xoá")) + '">' + ic("x") + '</button></div>').join("") +
-      '<button class="btn sm gh" onclick="dpDefAdd(' + i + ')">' + ic("plus") + esc(T("Thêm hàng loại 2")) + '</button>' +
-      '<div class="dysum" id="dys' + i + '">' + dpSumTxt(i) + '</div></div>';
-  }).join("");
+    (l.defs.length ? l.defs : [null]).forEach((x, j) => {
+      const first = j === 0;
+      h += '<div class="dyr' + (first ? " f" : "") + '">' +
+        '<div class="c1" data-l="' + esc(T("Người may")) + '">' + (i === 0 && first ? '<input id="dpsew" list="dl_sew" autocomplete="off" placeholder="' + esc(T("Tên người may")) + '" value="' + esc(DP.sewer) + '" oninput="DP.sewer=this.value">' + sewList() : "") + '</div>' +
+        '<div class="c2" data-l="' + esc(T("Mã hàng")) + (many ? " " + (i + 1) : "") + '">' + (!first ? "" : '<input class="dpprod" list="dl_prod" autocomplete="off" placeholder="' + esc(T("Mã hàng")) + '" value="' + esc(l.product) + '" oninput="DP.lines[' + i + '].product=this.value">') + '</div>' +
+        '<div class="c3" data-l="' + esc(T("Sản lượng thực tế")) + '">' + (first ? qIn("DP.lines[" + i + "]", l, i) : "") + '</div>' +
+        (x ? '<div class="c4" data-l="' + esc(T("Hàng loại 2")) + '">' + qIn("DP.lines[" + i + "].defs[" + j + "]", x, i) + '</div>' +
+          '<div class="c5" data-l="' + esc(T("Nguyên nhân")) + '"><select onchange="DP.lines[' + i + '].defs[' + j + '].cause=this.value"><option value="">' + esc(T("— Nguyên nhân —")) + '</option>' + co(j).map(o => '<option' + (o === x.cause ? " selected" : "") + '>' + esc(o) + '</option>').join("") + '</select></div>' +
+          '<div class="c6"><button class="btn sm w" onclick="dpDefRm(' + i + ',' + j + ')" aria-label="' + esc(T("Xoá")) + '">' + ic("x") + '</button></div>'
+          : '<div class="c4"></div><div class="c5"></div><div class="c6"></div>') + '</div>';
+    });
+    h += '<div class="dyr add"><div class="c45"><button class="btn sm gh" onclick="dpDefAdd(' + i + ')">' + ic("plus") + esc(T("Thêm hàng loại 2")) + '</button>' +
+      (many ? ' <button class="btn sm w" style="color:var(--r)" onclick="dpRm(' + i + ')">' + ic("trash") + esc(T("Xoá mã hàng này")) + '</button>' : "") + '</div></div>' +
+      '<div class="dysum" id="dys' + i + '">' + dpSumTxt(i) + '</div>';
+  });
+  h += '<datalist id="dl_prod">' + PL.map(v => '<option value="' + esc(v) + '">').join("") + '</datalist>' +
+    '<button class="btn sm" style="margin-top:6px" onclick="dpAdd()">' + ic("plus") + esc(T("Thêm mã hàng")) + '</button></div>';
   h += actorBox("Người báo cáo");
   if (DP.del) h += '<div class="card" style="border:1px solid #f0b9b9"><div class="lc"><label class="req">' + esc(T("Mã PIN / mật khẩu của {n}", {n: S.user.name})) + '</label><input id="dpdel_pw" type="password" autocomplete="off" onkeydown="if(event.key===\'Enter\')dpDelGo()"></div>' +
     '<div class="btns"><button class="btn w" onclick="DP.del=false;dpDraw()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="dpDelGo()">' + ic("trash") + esc(T("Xoá báo cáo này")) + '</button></div></div>';
@@ -1719,8 +1747,8 @@ function dpDraw(){
     '<button class="btn" onclick="dpSave()">' + ic("ok") + esc(T("LƯU BÁO CÁO")) + '</button></div>';
   el.innerHTML = h;
 }
-function dpAdd(){ DP.lines.push(Object.assign(dpNew(null), {product: ""})); dpDraw(); }
-function dpRm(i){ DP.lines.splice(i, 1); dpDraw(); }
+function dpAdd(){ const sw = $("#dpsew"); if (sw) DP.sewer = sw.value; DP.lines.push(Object.assign(dpNew(null), {product: ""})); dpDraw(); }
+function dpRm(i){ const sw = $("#dpsew"); if (sw) DP.sewer = sw.value; DP.lines.splice(i, 1); dpDraw(); }
 function dpDefAdd(i){ DP.lines[i].defs.push({ta: "", doi: "", cause: ""}); dpDraw(); }
 function dpDefRm(i, j){ DP.lines[i].defs.splice(j, 1); dpDraw(); }
 function dpSave(){
@@ -1740,7 +1768,7 @@ function dpSave(){
     }
     const b2 = defs.reduce((a, x) => a + x.b2, 0);
     if (b2 > q){ toast(T("{n}: hàng loại 2 lớn hơn sản lượng thực tế", {n: nm}), "err"); return; }
-    out.push({id: l.id, product: l.product, qty: q, b2, defects: defs}); tq += q; tb += b2;
+    out.push({id: l.id, product: String(l.product || "").trim(), qty: q, b2, defects: defs}); tq += q; tb += b2;
   }
   const date = DP.date, c = DP.c, sw = $("#dpsew"); if (sw) DP.sewer = sw.value;
   const run = () => {
@@ -2766,6 +2794,10 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Xoá mã hàng này": "この品番を削除",
+"(nếu có)": "（ある場合）",
+"Tên người may": "縫製者名",
+"Mã hàng máy đang may": "縫製中の品番",
 "Xoá dữ liệu": "データ削除",
 "Dữ liệu đã chọn sẽ bị xoá hẳn, không khôi phục được. Nên xuất Excel trước khi xoá.": "選択したデータは完全に削除され、元に戻せません。削除前にExcelへ出力してください。",
 "Chọn dữ liệu cần xoá": "削除するデータを選択",
