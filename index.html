@@ -355,7 +355,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "19/11/2026 10:30";
+const VERSION = "19/11/2026 10:45";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -1428,6 +1428,7 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
     if (isPend(i)) h += '<div class="hl" style="margin-top:12px">' + esc(T("Báo cáo đang chờ quản đốc duyệt. Bạn vẫn sửa lại được cho đến khi được duyệt.")) + '</div>';
     h += '<button class="btn ' + (isRej(i) ? "y" : "w") + '" style="margin-top:12px" onclick="go(\'incnew\',{edit:\'' + i._id + '\'})">' + ic("edit") + T(isRej(i) ? "SỬA VÀ GỬI LẠI" : "Sửa nội dung báo cáo") + '</button>';
   }
+  if (canDelInc(i)) h += '<button class="btn w" style="margin-top:10px;color:var(--r);border-color:#f0b9b9" onclick="incDelPop(\'' + i._id + '\')">' + ic("trash") + T("XOÁ BÁO CÁO NÀY") + '</button>';
   // Quản đốc: duyệt cuối cùng
   if (canApprove(i)) h += '<div class="btns" style="margin-top:12px"><button class="btn y" onclick="approveInc()">' + ic("ok") + T("DUYỆT BÁO CÁO") + '</button><button class="btn rj" onclick="rejPop(\'inc\',\'' + i._id + '\')">✖ ' + esc(T("KHÔNG DUYỆT")) + '</button></div>';
   else if (canUpdInc(i) && i.by !== S.user.id) h += '<div class="hl" style="margin-top:12px">' + esc(T("Máy do {n} báo. Bạn có thể ghi hướng xử lý hoặc sửa tiếp, tên bạn sẽ được lưu lại.", {n: i.byName || ""})) + '</div>';
@@ -1679,6 +1680,43 @@ function dayDevHist(c){
 /* Gợi ý tên người may: tên đã gán cho các máy + công nhân / tổ trưởng */
 function sewList(){ const n = new Set(); Object.values(S.dev).forEach(d => { if (d.sewer) n.add(d.sewer); }); people().forEach(a => n.add(a.name));
   return '<datalist id="dl_sew">' + Array.from(n).sort().map(x => '<option value="' + esc(x) + '">').join("") + '</datalist>'; }
+/* ---- Xoá báo cáo sự cố (chưa duyệt): iPad – người báo / người sửa / tổ trưởng nhập PIN; quản đốc, admin nhập PIN của mình.
+   Xoá luôn linh kiện đã thay và ảnh của báo cáo đó. Báo cáo đã duyệt thì không xoá được. */
+const canDelInc = i => !!i && !isLocked(i) && (canEditInc(i) || canFinal());
+function incDelPop(id){
+  const i = curInc0(id); if (!canDelInc(i)) return;
+  F.actId = ""; F.actPin = "";
+  cntPopShell(T("Xoá báo cáo sự cố"), true, '<div class="rjinfo"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + '<br><b>' + esc(i.desc || T("Sự cố")) + '</b><br>' +
+      esc(T("Báo: {n}", {n: i.byName || ""}) + " · " + fmtDT(i.at)) + ((i.parts || []).length ? '<br>' + esc(T("Linh kiện: {p}", {p: i.parts.map(r => r.n + " × " + r.q).join(", ")})) : "") + '</div>' +
+    '<div class="hl" style="margin-bottom:10px">' + esc(T("Báo cáo, linh kiện đã thay và ảnh của báo cáo này sẽ bị xoá hẳn, không khôi phục được.")) + '</div>' +
+    (isDevice() ? actorBox("Người xoá") + '<div class="mu sm" style="margin:-4px 2px 10px">' + esc(T("Chỉ người báo, người sửa hoặc tổ trưởng được xoá.")) + '</div>'
+      : '<div class="lc"><label class="req">' + esc(T("Mã PIN / mật khẩu của {n}", {n: S.user.name})) + '</label><input id="idel_pw" type="password" autocomplete="off" onkeydown="if(event.key===\'Enter\')incDelGo(\'' + id + '\')"></div>') +
+    '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="incDelGo(\'' + id + '\')">' + ic("trash") + esc(T("Xoá")) + '</button></div>');
+}
+async function incDelGo(id){
+  const i = curInc0(id); if (!canDelInc(i)) return;
+  if (isDevice()){
+    const a = await getActor(); if (!a) return;
+    if (!(a.id === i.by || a.id === i.fixById || a.role === "leader")){ toast(T("Chỉ người báo, người sửa hoặc tổ trưởng được xoá báo cáo này."), "err"); return; }
+  } else {
+    const pw = String(($("#idel_pw") || {}).value || "").trim(), a = S.acc[S.user.id];
+    if (!pw){ toast(T("Hãy nhập mã PIN / mật khẩu."), "err"); return; }
+    if (Date.now() < CNT_LOCK){ toast(T("Nhập sai nhiều lần. Chờ 1 phút rồi thử lại."), "err"); return; }
+    let ok = false; try { ok = !!a && !!a.salt && !!a.hash && await sha256(a.salt + ":" + pw) === a.hash; } catch(e){}
+    if (!ok){ if (++CNT_FAIL >= 5){ CNT_FAIL = 0; CNT_LOCK = Date.now() + 60000; } const x = $("#idel_pw"); if (x){ x.value = ""; x.focus(); } toast(T("Sai mã PIN / mật khẩu."), "err"); return; }
+    CNT_FAIL = 0;
+  }
+  busy(true);
+  try {
+    const ps = await withTimeout(Q("parts", "srcId", id).get(), 15000);
+    const parts = docs("parts", ps).filter(x => x.src === "inc" || !x.src);
+    const phs = (i.photos || []).concat((i.parts || []).map(r => r.phId).filter(Boolean));
+    await withTimeout(Promise.all([delDoc("incidents", id)].concat(parts.map(x => delDoc("parts", x._id))).concat(phs.map(ph => R("photos", ph).delete().catch(() => {})))), 20000);
+    delete S.incOpen[id]; delete S.incPend[id]; S.incMonth = S.incMonth.filter(x => x._id !== id); S.incAppr = S.incAppr.filter(x => x._id !== id); F.incCache = null; F.histFor = "";
+    closePop(); toast(T("Đã xoá báo cáo sự cố"), "ok"); back();
+  } catch(e){ toast(T(e && e.code === "permission-denied" ? "Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules." : "Chưa xoá được. Kiểm tra mạng rồi thử lại."), "err"); }
+  finally { busy(false); }
+}
 /* ---- Popup nhập / sửa báo cáo cuối ngày của 1 máy ---- */
 let DP = null;
 const dpNew = d => ({id: "l" + uid(), product: d && !d.noProd ? (d.product || "") : "", ta: "", doi: "", defs: [{ta: "", doi: "", cause: ""}]});
@@ -2794,6 +2832,14 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"XOÁ BÁO CÁO NÀY": "この報告を削除",
+"Xoá báo cáo sự cố": "故障報告の削除",
+"Linh kiện: {p}": "部品：{p}",
+"Báo cáo, linh kiện đã thay và ảnh của báo cáo này sẽ bị xoá hẳn, không khôi phục được.": "この報告と交換部品・写真は完全に削除され、復元できません。",
+"Người xoá": "削除者",
+"Chỉ người báo, người sửa hoặc tổ trưởng được xoá.": "報告者・修理者・班長のみ削除できます。",
+"Chỉ người báo, người sửa hoặc tổ trưởng được xoá báo cáo này.": "この報告は報告者・修理者・班長のみ削除できます。",
+"Đã xoá báo cáo sự cố": "故障報告を削除しました",
 "Xoá mã hàng này": "この品番を削除",
 "(nếu có)": "（ある場合）",
 "Tên người may": "縫製者名",
