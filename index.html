@@ -355,7 +355,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "19/11/2026 10:45";
+const VERSION = "26/11/2026 08:30";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -478,6 +478,7 @@ const DEF_CFG = {areas:["Xưởng May"], kinds:[],
   groups:["Máy may"],
   depts:["May","Bảo trì"],
   products:[],
+  sewers:[],
   parts:["Kim may","Chân vịt","Ổ chao","Thuyền chỉ","Suốt chỉ","Răng cưa","Mặt nguyệt","Dao cắt chỉ","Dây curoa","Bạc đạn","Motor","Lò xo","Cảm biến"],
   defects:["Bỏ mũi","Đứt chỉ","Lệch đường may","Đường may nhăn","Sai thông số","Bẩn / dính dầu","Thủng / rách","Khác"]};
 const GAUGES = ["7G","8G","10G","13G","15G"];                       // loại máy đan
@@ -1678,7 +1679,7 @@ function dayDevHist(c){
 }
 
 /* Gợi ý tên người may: tên đã gán cho các máy + công nhân / tổ trưởng */
-function sewList(){ const n = new Set(); Object.values(S.dev).forEach(d => { if (d.sewer) n.add(d.sewer); }); people().forEach(a => n.add(a.name));
+function sewList(){ const n = new Set(S.cfg.sewers || []); Object.values(S.dev).forEach(d => { if (d.sewer) n.add(d.sewer); }); people().forEach(a => n.add(a.name));
   return '<datalist id="dl_sew">' + Array.from(n).sort().map(x => '<option value="' + esc(x) + '">').join("") + '</datalist>'; }
 /* ---- Xoá báo cáo sự cố (chưa duyệt): iPad – người báo / người sửa / tổ trưởng nhập PIN; quản đốc, admin nhập PIN của mình.
    Xoá luôn linh kiện đã thay và ảnh của báo cáo đó. Báo cáo đã duyệt thì không xoá được. */
@@ -2154,7 +2155,10 @@ VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiế
   h += fld("fname", "Tên thiết bị", d.name, {req: 1});
   h += '<div class="lc"><label>' + esc(T("Khu vực")) + '</label><input id="farea" list="dl_area" value="' + esc(d.area || "") + '"></div>';
   h += '<datalist id="dl_area">' + areasAll().map(a => '<option value="' + esc(a) + '">').join("") + '</datalist>';
-  h += '<div class="lc"><label>' + esc(T("Người may")) + '</label><input id="fsewer" list="dl_sew" autocomplete="off" value="' + esc(d.sewer || "") + '">' + sewList() + '</div>';
+  const sws = (S.cfg.sewers || []).slice(); if (d.sewer && sws.indexOf(d.sewer) < 0) sws.push(d.sewer);
+  h += '<div class="lc"><label>' + esc(T("Người may")) + '</label><select id="fsewer"><option value="">' + esc(T("— Chọn người may —")) + '</option>' +
+    sws.map(x => '<option' + (x === d.sewer ? " selected" : "") + '>' + esc(x) + '</option>').join("") + '</select>' +
+    (sws.length ? "" : '<div class="mu sm" style="margin-top:4px">' + esc(T("Chưa có tên người may. Thêm trong Cài đặt danh mục → Người may.")) + '</div>') + '</div>';
   h += '<div class="grid2">' + fld("fmaker", "Hãng", d.maker) + fld("fmodel", "Model", d.model) + '</div>';
   h += fld("fsince", "Ngày đưa vào sử dụng", d.since, {attr: ' type="date"'});
   if (e) h += '<div class="ck ' + (F.status === "off" ? "on" : "") + '" onclick="F.status=F.status===\'off\'?\'ok\':\'off\';this.classList.toggle(\'on\',F.status===\'off\')"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Ngừng sử dụng máy này (ẩn khỏi danh sách máy may)")) + '</span></div>';
@@ -2621,6 +2625,8 @@ VIEWS.settings = {mgr: true, noDir: true, title: () => T("Cài đặt danh mục
   return '<div class="lc"><label>' + esc(T("Bộ phận (mỗi dòng 1 mục)")) + '</label><textarea id="sdepts" rows="5">' + esc((S.cfg.depts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Nhóm máy (mỗi dòng 1 mục)")) + '</label><textarea id="sgroups" rows="4">' + esc((S.cfg.groups || []).join("\n")) + '</textarea>' +
       '<div class="mu sm" style="margin-top:4px">' + esc(T("Ví dụ: Máy may 1 kim, Máy may 2 kim, Máy vắt sổ…")) + '</div></div>' +
+    '<div class="lc"><label>' + esc(T("Người may (mỗi dòng 1 người)")) + '</label><textarea id="ssewers" rows="6">' + esc((S.cfg.sewers || []).join("\n")) + '</textarea>' +
+      '<div class="mu sm" style="margin-top:4px">' + esc(T("Danh sách này dùng để chọn người may khi thêm / sửa thiết bị.")) + '</div></div>' +
     '<div class="lc"><label>' + esc(T("Mã hàng (mỗi dòng 1 mục)")) + '</label><textarea id="sprods" rows="6">' + esc((S.cfg.products || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Nguyên nhân hàng loại 2 (mỗi dòng 1 mục)")) + '</label><textarea id="sdefects" rows="6">' + esc((S.cfg.defects || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Danh mục linh kiện (mỗi dòng 1 mục)")) + '</label><textarea id="sparts" rows="6">' + esc((S.cfg.parts || []).join("\n")) + '</textarea></div>' +
@@ -2629,7 +2635,7 @@ VIEWS.settings = {mgr: true, noDir: true, title: () => T("Cài đặt danh mục
 }};
 function saveCfg(){
   const sp = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
-  put("config", "main", {products: sp("#sprods"), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), defects: sp("#sdefects")}, true); savedMsg(); back();
+  put("config", "main", {sewers: Array.from(new Set(sp("#ssewers"))), products: sp("#sprods"), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), defects: sp("#sdefects")}, true); savedMsg(); back();
 }
 /* ---- Xuất CSV ---- */
 VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
@@ -2852,6 +2858,10 @@ const JA = {
 "Xoá dữ liệu số lượng đã nhập": "入力済みの数量データを削除",
 "Xoá toàn bộ báo cáo cuối ngày (sản lượng, loại 2)": "日報（生産数・B品）をすべて削除",
 "Người may": "縫製者",
+"— Chọn người may —": "— 縫製者を選択 —",
+"Người may (mỗi dòng 1 người)": "縫製者（1行に1名）",
+"Danh sách này dùng để chọn người may khi thêm / sửa thiết bị.": "設備の追加・編集で縫製者を選ぶときに使う一覧です。",
+"Chưa có tên người may. Thêm trong Cài đặt danh mục → Người may.": "縫製者が未登録です。マスタ設定 → 縫製者 で追加してください。",
 "Tên người may máy này": "この機械の縫製者名",
 "Theo người may": "縫製者別",
 "Tìm mã máy, tên máy, người may, mã hàng": "機械コード・機械名・縫製者・品番で検索",
