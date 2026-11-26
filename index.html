@@ -346,6 +346,20 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
   .dyr .c45{text-align:left}
 }
 .rgrid{margin-top:14px}
+/* Hướng dẫn vận hành (giám đốc) */
+.gdbtn{display:flex;align-items:center;gap:12px;width:100%;border:1.5px solid var(--g);background:var(--gl);color:var(--g2);border-radius:14px;padding:12px 14px;margin-bottom:12px;cursor:pointer;text-align:left;font:inherit}
+.gdbtn b{display:block;font-size:17px}.gdbtn small{display:block;font-size:13px;color:var(--mu);font-weight:500}.gdbtn .f{flex:1;min-width:0}
+.gd-sum{background:var(--gl);border-radius:12px;padding:12px 14px;font-size:15.5px;line-height:1.6}
+.gd-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px;font-size:13.5px;font-weight:700}
+.gd-flow span{background:var(--g);color:#fff;border-radius:999px;padding:4px 11px}.gd-flow i{font-style:normal;color:var(--mu)}
+.gd-steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.gd-steps li{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:start}
+.gd-steps .n{width:32px;height:32px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.gd-steps .n.r{background:var(--r)}.gd-steps .n.a{background:#E0A100;color:#2b2000}
+.gd-steps b{display:block;font-size:16px}.gd-steps .d{color:var(--mu);font-size:14.5px;line-height:1.55}
+.gd-roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.gd-roles div{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.5;background:#fff}
+.gd-roles b{display:block;font-size:15px;margin-bottom:2px;color:var(--g2)}
 </style>
 </head>
 <body>
@@ -356,7 +370,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "26/11/2026 09:30";
+const VERSION = "26/11/2026 15:30";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -866,6 +880,7 @@ const VIEWS = {};
 VIEWS.home = {wide: true, live: true, html(){
   const b = buckets(), u = S.user;
   let h = '<div class="hgrid"><div>' + '<div class="row" style="margin-bottom:12px"><div class="f"><div class="mu sm">' + esc(T("Xin chào")) + '</div><div class="b" style="font-size:19px">' + esc(u.name) + '</div></div>' + chip(ROLES[u.role], "g") + '</div>';
+  if (isDirector()) h += '<button class="gdbtn" onclick="go(\'guide\')">' + ic("list") + '<span class="f"><b>' + esc(T("Hướng dẫn vận hành app")) + '</b><small>' + esc(T("Quy trình, thứ tự nhập – để giải thích cho khách hàng")) + '</small></span>' + ic("chev") + '</button>';
   h += '<button class="btn bigscan" onclick="openScan()">' + ic("qr") + T("QUÉT MÃ QR MÁY") + '</button>';
   // hôm nay: máy đang hỏng, số máy đã báo cáo cuối ngày, tỷ lệ loại 2
   { const act = knitDevs(), E = (dayDoc(today()) || {}).m || {}, rp = act.filter(d => E[d._id]), tq = rp.reduce((a, d) => a + (+E[d._id].qty || 0), 0), tb = rp.reduce((a, d) => a + (+E[d._id].b2 || 0), 0);
@@ -2522,6 +2537,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); 
 VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
   const m = (icn, t, fn, sub) => '<div class="it" onclick="' + fn + '">' + ic(icn) + '<div class="f"><div class="t1">' + esc(T(t)) + '</div>' + (sub ? '<div class="t2">' + esc(sub) + '</div>' : "") + '</div>' + ic("chev") + '</div>';
   if (isDirector()) return '<div class="menu">' + userCard() +
+    m("list", "Hướng dẫn vận hành app", "go('guide')", T("Quy trình, thứ tự nhập – để giải thích cho khách hàng")) +
     m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
     m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
@@ -2534,6 +2550,52 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
     (isAdmin() ? m("trash", "Xoá dữ liệu số lượng đã nhập", "F={};go('purge',{only:'daily'})", T("Xoá toàn bộ báo cáo cuối ngày (sản lượng, loại 2)")) : "") +
     (isAdmin() ? m("trash", "Xoá toàn bộ dữ liệu", "F={};go('purge')", T("Chỉ Quản trị, cần mật khẩu")) : "") +
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
+}};
+/* ---- Hướng dẫn vận hành: giám đốc đọc để hiểu app và giải thích cho khách hàng ---- */
+VIEWS.guide = {wide: true, mgr: true, title: () => T("Hướng dẫn vận hành app"), html(){
+  const ja = LANG === "ja", L = (v, j) => ja ? j : v;
+  const steps = arr => '<ol class="gd-steps">' + arr.map((x, i) => '<li><span class="n ' + (x[2] || "") + '">' + (i + 1) + '</span><div><b>' + x[0] + '</b><div class="d">' + x[1] + '</div></div></li>').join("") + '</ol>';
+  const card = (t, body) => '<div class="card"><h3 style="margin-top:0">' + t + '</h3>' + body + '</div>';
+  const setup = [
+    [L("Tạo tài khoản", "アカウント作成"), L("Mỗi người một mã nhân viên + mã PIN. Tạo thêm 1 tài khoản “iPad máy” cho tablet đặt ở xưởng.", "1人1つの社員番号＋PIN。工場に置くタブレット用に「共用タブレット」アカウントも作成します。")],
+    [L("Khai báo danh mục", "マスタ登録"), L("Nhóm máy, người may, mã hàng, nguyên nhân hàng loại 2, linh kiện, khu vực.", "設備グループ、縫製者、品番、B品の原因、部品、エリア。")],
+    [L("Thêm máy và dán tem QR", "設備登録・QRラベル貼付"), L("Mỗi máy có mã riêng (MM-0001…). In tem QR và dán lên máy.", "各設備に固有コード（MM-0001…）。QRラベルを印刷して設備に貼ります。")],
+    [L("Gán mã hàng cho máy", "設備に品番を設定"), L("Quản đốc chọn nhiều máy một lúc và gán mã hàng đang may. Đổi mã hàng thì làm lại bước này.", "工場長が複数の設備を選び、縫製中の品番を設定します。品番変更時も同様です。")]
+  ];
+  const day = [
+    [L("Máy hỏng → Báo sự cố", "故障 → 異常報告"), L("Trên iPad máy: quét QR của máy → mô tả lỗi, chụp ảnh (nếu cần) → chọn tên + nhập PIN → Gửi. Máy chuyển sang “Đang hỏng”.", "共用タブレットで設備のQRを読み取り → 内容を入力、必要なら写真 → 名前を選びPIN入力 → 送信。設備は「故障中」になります。"), "r"],
+    [L("Đang sửa → Ghi hướng xử lý", "修理中 → 対応方針を記録"), L("Nếu chưa sửa ngay được (ví dụ chờ linh kiện), ghi hướng xử lý để mọi người cùng theo dõi.", "すぐ直せない場合（部品待ちなど）は対応方針を記録し、全員で状況を共有します。"), "a"],
+    [L("Sửa xong → Ghi kết quả", "修理完了 → 結果を記録"), L("Chọn “Đã sửa xong”, ghi đã sửa thế nào, linh kiện đã thay, và linh kiện cũ thu hồi (đủ / chưa đủ bộ phận + chụp ảnh). App tự tính thời gian máy hỏng.", "「修理完了」を選び、修理内容・交換部品・回収した旧部品（全部回収／不足＋写真）を記録。故障時間は自動計算されます。")],
+    [L("Cuối ngày → Báo cáo sản lượng", "終業 → 日報入力"), L("Quét QR từng máy → người may, mã hàng, sản lượng thực tế (tá + đôi), hàng loại 2 và nguyên nhân. App tự tính tỷ lệ loại 2.", "各設備のQRを読み取り → 縫製者・品番・実生産数（打＋双）・B品と原因を入力。B品率は自動計算されます。")]
+  ];
+  const appr = [
+    [L("Quản đốc duyệt báo cáo sự cố", "工場長が異常報告を承認"), L("Sau khi sửa xong, báo cáo chờ quản đốc duyệt (ngay trên Trang chủ). Linh kiện đã thay chỉ được tính vào thống kê khi đã duyệt.", "修理完了後、報告は工場長の承認待ちになります（ホーム画面）。交換部品は承認後に集計に反映されます。")],
+    [L("Không duyệt → trả lại", "非承認 → 差し戻し"), L("Quản đốc ghi lý do; người báo sửa lại trên iPad rồi gửi lại. Quản đốc tự báo và tự sửa xong thì tự động duyệt.", "工場長が理由を記入し、報告者がiPadで修正して再提出します。工場長自身が報告・修理した場合は自動で承認されます。"), "r"]
+  ];
+  const roles = [
+    [L("Công nhân / Tổ trưởng", "作業者・班長"), L("Thao tác trên iPad máy: chọn tên + PIN mỗi lần lưu. Tổ trưởng còn nhập được báo cáo cuối ngày bằng tài khoản của mình.", "共用タブレットで保存のたびに名前＋PIN。班長は自分のアカウントでも日報を入力できます。")],
+    [L("iPad máy", "共用タブレット"), L("Tablet dùng chung tại xưởng. Báo sự cố và cập nhật sửa chữa chỉ làm trên iPad máy.", "工場の共用端末。異常報告と修理の更新は共用タブレットでのみ行います。")],
+    [L("Quản đốc", "工場長"), L("Duyệt sự cố, gán mã hàng, thêm / sửa máy, tạo tài khoản tổ trưởng và công nhân.", "異常の承認、品番設定、設備の追加・編集、班長・作業者のアカウント作成。")],
+    [L("Admin", "管理者"), L("Toàn quyền cài đặt; duyệt thay quản đốc khi cần.", "すべての設定が可能。必要時は工場長に代わり承認できます。")],
+    [L("Giám đốc", "社長"), L("Chỉ xem toàn bộ, không lưu / sửa / xoá được gì.", "すべて閲覧のみ。保存・編集・削除はできません。")]
+  ];
+  const see = [
+    [L("Trang chủ", "ホーム"), L("Số máy đang hỏng, số máy đã báo cáo cuối ngày, tỷ lệ loại 2 hôm nay, báo cáo chờ duyệt.", "故障中の台数、日報入力済み台数、本日のB品率、承認待ちの報告。")],
+    [L("Sự cố", "異常"), L("Máy đang hỏng (bao nhiêu ngày), chờ duyệt, bị trả lại, đã sửa xong trong tháng.", "故障中（日数）、承認待ち、差し戻し、当月の修理完了。")],
+    [L("Báo cáo", "レポート"), L("Sản lượng, tỷ lệ loại 2 theo ngày, nguyên nhân chính, số lần hỏng, thời gian sửa, linh kiện, quản lý kim; xuất Excel.", "生産数、日別B品率、主な原因、故障回数、修理時間、部品、針の管理。Excel出力。")],
+    [L("Xem như", "表示画面"), L("Ô chọn trên đầu trang: xem đúng màn hình của quản đốc, tổ trưởng, công nhân hoặc iPad máy – chỉ xem.", "画面上部の選択欄：工場長・班長・作業者・共用タブレットの画面をそのまま確認（閲覧のみ）。")]
+  ];
+  const grid = arr => '<div class="gd-roles">' + arr.map(r => '<div><b>' + r[0] + '</b>' + r[1] + '</div>').join("") + '</div>';
+  return card(L("Tóm tắt để giải thích cho khách hàng", "お客様への説明（要約）"),
+      '<div class="gd-sum">' + L("App quản lý toàn bộ máy may trong xưởng bằng <b>mã QR dán trên từng máy</b>. Khi máy hỏng, công nhân quét QR trên iPad để <b>báo sự cố</b>, thợ sửa ghi lại cách sửa và <b>linh kiện đã thay</b>, rồi <b>quản đốc duyệt</b>. Cuối ngày nhập <b>sản lượng và hàng loại 2</b> của từng máy. Ai làm, lúc nào, máy hỏng bao lâu đều được ghi tự động; báo cáo tháng và Excel có ngay.",
+        "工場のミシンを<b>各設備に貼ったQRコード</b>で管理するアプリです。故障時は作業者がiPadでQRを読み取り<b>異常報告</b>し、修理担当が修理内容と<b>交換部品</b>を記録、<b>工場長が承認</b>します。終業時には設備ごとの<b>生産数とB品</b>を入力します。誰が・いつ・どれだけ停止したかは自動記録され、月次レポートとExcelもすぐ作れます。") + '</div>' +
+      '<div class="gd-flow">' + [L("Quét QR máy", "QR読取"), L("Báo sự cố", "異常報告"), L("Sửa xong", "修理完了"), L("Quản đốc duyệt", "工場長承認"), L("Báo cáo cuối ngày", "日報"), L("Báo cáo tháng / Excel", "月次・Excel")].map(x => '<span>' + x + '</span>').join('<i>→</i>') + '</div>') +
+    card(L("1. Chuẩn bị (làm 1 lần)", "1. 事前準備（1回のみ）"), steps(setup)) +
+    card(L("2. Thứ tự nhập hằng ngày (trên iPad máy)", "2. 毎日の入力順序（共用タブレット）"), steps(day) +
+      '<div class="mu sm" style="margin-top:12px">' + L("Mỗi lần lưu trên iPad đều phải chọn tên và nhập PIN, nên biết chính xác ai đã làm. Mất mạng vẫn nhập được, có mạng sẽ tự gửi.", "共用タブレットでは保存のたびに名前とPINが必要なため、誰が作業したか正確に分かります。オフラインでも入力でき、接続後に自動送信されます。") + '</div>') +
+    card(L("3. Duyệt", "3. 承認"), steps(appr)) +
+    card(L("4. Ai làm gì", "4. 役割"), grid(roles)) +
+    card(L("5. Giám đốc xem ở đâu", "5. 社長の確認場所"), grid(see)) + foot();
 }};
 VIEWS.me = {title: () => T("Tôi"), html(){
   return '<div class="menu">' + userCard() +
@@ -3094,6 +3156,7 @@ const JA = {
 "Người nhập": "入力者",
 "đặt lại bộ đếm": "カウンターリセット",
 "Chưa có lần nhập sản lượng nào.": "生産量の入力はまだありません。",
+"Hướng dẫn vận hành app": "操作ガイド", "Quy trình, thứ tự nhập – để giải thích cho khách hàng": "業務の流れと入力順序（お客様への説明用）",
 "Giám đốc": "社長", "Chỉ xem": "閲覧のみ", "Xem như": "表示画面", "Giám đốc chỉ được xem, không thể lưu hay xoá.": "社長は閲覧のみで、保存・削除はできません。",
 "In / PDF": "印刷 / PDF",
 "In lúc {t}": "印刷日時 {t}",
