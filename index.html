@@ -25,6 +25,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--g);box-s
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 /* Header */
 .top{position:sticky;top:0;z-index:30;background:var(--g);color:#fff;display:flex;align-items:center;gap:10px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.vbar{position:sticky;top:calc(56px + env(safe-area-inset-top));z-index:29;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff7d6;border-bottom:1px solid #ecd98a;padding:6px 12px;font-size:14px;font-weight:600}.vbar label{display:flex;gap:8px;align-items:center;flex:1;min-width:0}.vbar select{flex:1;min-width:0;max-width:340px;font:inherit;font-weight:500;padding:6px 8px;border-radius:8px;border:1px solid #c9b25a;background:#fff}
 .top .lg{width:40px;height:40px;border-radius:10px;background:#fff;object-fit:contain;padding:2px}
 .top .ttl{flex:1;min-width:0;line-height:1.15}
 .top .ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -355,7 +356,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "26/11/2026 08:30";
+const VERSION = "26/11/2026 09:30";
 const COLLECTION = "kachiboshicuonbien";              // collection riêng của app Máy may
 const firebaseConfig = {   // project kachiboshivn (app Máy may)
   apiKey: "AIzaSyDeL5Kyz72Y3PAH6A3bQghDPGbK0oEKWE4",
@@ -428,7 +429,18 @@ function sha256js(m){
   return H.map(v => (v >>> 0).toString(16).padStart(8, "0")).join("");
 }
 let toastT;
-function toast(msg, kind){ const t = $("#toast"); t.textContent = msg; t.className = "toast " + (kind || ""); t.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = "none", kind === "err" ? 4500 : 2600); }
+/* Giám đốc (kể cả khi "xem như" vai trò khác): CHỈ XEM. Mọi lệnh ghi / xoá lên Firestore bị chặn tại tầng thư viện */
+const RO_MSG = () => T("Giám đốc chỉ được xem, không thể lưu hay xoá.");
+let roAt = 0;
+const roOn = () => !!(typeof S !== "undefined" && S.real);
+function roErr(){ roAt = 0; toast(RO_MSG(), "err"); roAt = Date.now(); const e = new Error("read-only"); e.code = "read-only"; return e; }
+function roGuard(){
+  const pr = Object.getPrototypeOf(COL.doc("__ro_probe__"));
+  ["set", "update", "delete"].forEach(k => { const f = pr[k]; if (typeof f !== "function" || f.__ro) return; const g = function(){ return roOn() ? Promise.reject(roErr()) : f.apply(this, arguments); }; g.__ro = 1; pr[k] = g; });
+  const tx = FS.runTransaction.bind(FS); FS.runTransaction = function(){ return roOn() ? Promise.reject(roErr()) : tx.apply(null, arguments); };
+  const bt = FS.batch.bind(FS); FS.batch = function(){ const b = bt(); const c = b.commit.bind(b); b.commit = () => roOn() ? Promise.reject(roErr()) : c(); return b; };
+}
+function toast(msg, kind){ if (roAt && Date.now() - roAt < 2500) return; const t = $("#toast"); t.textContent = msg; t.className = "toast " + (kind || ""); t.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = "none", kind === "err" ? 4500 : 2600); }
 function busy(on){ $("#busy").style.display = on ? "flex" : "none"; }
 function vib(){ try { navigator.vibrate && navigator.vibrate(80); } catch(e){} }
 
@@ -512,6 +524,7 @@ function put(c, id, data, merge){
   return p;
 }
 function onErr(e){
+  if (e && e.code === "read-only") return;   /* đã báo "Giám đốc chỉ được xem" */
   console.error(e);
   if (e && e.code === "permission-denied") toast(T("Firestore từ chối truy cập. Kiểm tra Security Rules."), "err");
   else if (e && e.code === "unavailable") toast(T("Mất kết nối. Dữ liệu sẽ được gửi khi có mạng."), "err");
@@ -521,7 +534,7 @@ function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => set
 const savedMsg = () => toast(navigator.onLine ? T("Đã lưu") : T("Đã lưu. Có mạng sẽ tự gửi lên."), "ok");
 
 /* ================== TRẠNG THÁI ================== */
-const S = {user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incPend: {}, logPend: {}, logRej: {}, logAppr: [], incAppr: [], incMonth: [], logsMonth: [], daily: [], dayMap: {}, cfg: Object.assign({}, DEF_CFG), loaded: {}};
+const S = {real: null, viewAs: "", user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incPend: {}, logPend: {}, logRej: {}, logAppr: [], incAppr: [], incMonth: [], logsMonth: [], daily: [], dayMap: {}, cfg: Object.assign({}, DEF_CFG), loaded: {}};
 let V = {view: "home", p: {}};
 let UNSUB = [];
 let PH = [];            // ảnh đang chọn trong form
@@ -534,6 +547,21 @@ const isAdmin = () => S.user && S.user.role === "admin";
 const isDevice = () => S.user && S.user.role === "device";   // tablet dùng chung tại xưởng
 /* Người thực hiện thao tác: trên iPad máy là người đã chọn tên + nhập PIN, còn lại là người đăng nhập */
 let ACT = null;
+/* Giám đốc "xem như": S.real là tài khoản giám đốc thật; S.user là vai trò đang xem (quản đốc / tổ trưởng / công nhân / iPad máy) */
+function viewUser(){ const b = S.real, v = S.viewAs || ""; if (!b) return S.user;
+  if (v === "manager" || v === "device") return {id: b.id, name: b.name, role: v, dir: true};
+  if (v.indexOf("acc:") === 0){ const id = v.slice(4), a = S.acc[id]; if (a && ["leader", "worker"].indexOf(a.role) >= 0) return {id, name: a.name, role: a.role, dir: true}; }
+  return {id: b.id, name: b.name, role: "director", dir: true}; }
+function setUser(u){ S.real = u.role === "director" ? {id: u.id, name: u.name, role: u.role} : null;
+  if (!S.real){ S.viewAs = ""; lsSet("mm_view", null); }
+  S.user = S.real ? viewUser() : {id: u.id, name: u.name, role: u.role}; }
+function setView(v){ if (!S.real) return; S.viewAs = v || ""; lsSet("mm_view", S.viewAs || null); S.user = viewUser(); F = {}; PH = []; ACT = null; closePop(); go("home", {}, true); }
+function viewBar(){ if (!S.real) return "";
+  const v = S.viewAs || "", o = (val, lab) => '<option value="' + esc(val) + '"' + (val === v ? " selected" : "") + '>' + esc(lab) + '</option>';
+  const acc = r => Object.values(S.acc).filter(a => a.role === r && a.active !== false).sort((a, b) => a.name < b.name ? -1 : 1);
+  const grp = (r, lab) => { const L = acc(r); return L.length ? '<optgroup label="' + esc(T(lab)) + '">' + L.map(a => o("acc:" + a._id, a.name + ((a.dept || a.area) ? " · " + (a.dept || a.area) : ""))).join("") + '</optgroup>' : ""; };
+  return '<div class="vbar"><span>👁 ' + esc(T("Chỉ xem")) + '</span><label>' + esc(T("Xem như")) + '<select onchange="setView(this.value)">' +
+    o("", T("Giám đốc")) + o("manager", T("Quản đốc")) + o("device", T("iPad máy")) + grp("leader", "Tổ trưởng") + grp("worker", "Công nhân") + '</select></label></div>'; }
 const me = () => ACT || S.user;
 const people = () => Object.values(S.acc).filter(a => a.active !== false && ["worker", "leader"].indexOf(a.role) >= 0).sort((a, b) => a.name < b.name ? -1 : 1);
 function actorBox(label, defId){
@@ -550,6 +578,7 @@ async function getActor(){
   const id = ($("#actId") || {}).value || "", pin = (($("#actPin") || {}).value || "").trim(), a = S.acc[id];
   if (!id || !a){ toast(T("Chọn tên người phụ trách"), "err"); const x = $("#actId"); if (x) x.scrollIntoView({block: "center"}); return null; }
   if (a.active === false){ toast(T("Tài khoản đã bị khoá"), "err"); return null; }
+  if (S.real) return {id, name: a.name, role: a.role};   /* giám đốc xem thử: không cần PIN, lệnh lưu phía sau vẫn bị chặn */
   if (!/^\d{4,8}$/.test(pin) || await sha256(a.salt + ":" + pin) !== a.hash){ toast(T("Sai mã PIN"), "err"); F.actPin = ""; const x = $("#actPin"); if (x){ x.value = ""; x.focus(); } return null; }
   F.actPin = "";
   return {id, name: a.name, role: a.role};
@@ -585,6 +614,7 @@ function rebuild(){
   S.logPend = map(log.filter(x => x.appr === false)); S.logRej = map(log.filter(x => x.rej === true));
   S.daily = L.day || []; S.dayMap = map(S.daily);
   S.loaded.dev = 1; S.loaded.plans = 1;
+  if (S.real && S.viewAs && S.user && S.user.role === "director"){ const u = viewUser(); if (u.role !== "director"){ S.user = u; V = {view: "home", p: {}}; return render(); } }
   liveRender();
 }
 let rbT; const rebuildSoon = () => { clearTimeout(rbT); rbT = setTimeout(rebuild, 40); };
@@ -621,6 +651,7 @@ function deltaListen(){
 }
 /* Xoá 1 bản ghi và để lại "bia mộ" cho các máy khác xoá khỏi bộ nhớ đệm */
 function delDoc(c, id){
+  if (roOn()) return Promise.reject(roErr());
   const full = TYPES[c] + "_" + id;
   delete DB0[full]; HC_drop(full); rebuildSoon();
   return Promise.all([R(c, id).delete(), put("tomb", full, {ref: full})]);
@@ -721,7 +752,7 @@ function render(keepScroll){
       '<span class="dot ' + (navigator.onLine ? "" : "off") + '" id="netdot" title="online"></span>' +
       '<button class="hb" onclick="setLang(LANG===\'vi\'?\'ja\':\'vi\')">' + (LANG === "vi" ? "日本語" : "Tiếng Việt") + '</button>' +
       (isViewer() ? '<button class="hb" onclick="go(\'more\')" aria-label="menu">' + ic("user") + '</button>' : "") +
-    '</header>' +
+    '</header>' + viewBar() +
     '<main id="main" class="' + (v.wide ? "wide " : "") + "v-" + V.view + '">' + v.html() + '</main>' +
     '<nav class="bn" id="nav"></nav>';
   renderChrome();
@@ -1604,6 +1635,7 @@ function dayFetch(date){
 }
 /* Ghi 1 máy của 1 ngày (ent = null: xoá mục của máy đó) */
 function dayPut(date, c, ent){
+  if (roOn()){ const e = roErr(); return Promise.reject(e); }
   const k = TYPES.daily + "_" + date, now = Date.now();
   const cur = DB0[k] || {type: TYPES.daily, date, month: ym(date), m: {}}, m = Object.assign({}, cur.m || {});
   if (ent) m[c] = ent; else delete m[c];
@@ -2783,7 +2815,7 @@ async function doLogin(first){
   } catch(e){ const c = (e && e.code) || "unknown"; const el = $("#connerr"); if (el && c !== "dup") el.innerHTML = connErr(c); else onErr(e); } finally { busy(false); }
 }
 function enter(u){
-  S.user = {id: u.id, name: u.name, role: u.role};
+  S.viewAs = ""; lsSet("mm_view", null); setUser(u);
   lsSet("mm_sess", JSON.stringify(u)); lsSet("mm_last", u.id);
   startLive();
   const c = PENDING_DEV; PENDING_DEV = null;
@@ -2791,7 +2823,7 @@ function enter(u){
 }
 function logout(){
   if (!confirm(T("Đăng xuất?"))) return;
-  lsSet("mm_sess", null); S.user = null; S.acc = {}; F = {}; stopLive(); loginScreen(false);
+  lsSet("mm_sess", null); lsSet("mm_view", null); S.real = null; S.viewAs = ""; S.user = null; S.acc = {}; F = {}; stopLive(); loginScreen(false);
 }
 
 /* ================== KHỞI ĐỘNG ================== */
@@ -2805,6 +2837,7 @@ async function boot(){
     FS = firebase.firestore();
     try { await FS.enablePersistence({synchronizeTabs: true}); } catch(e){}
     COL = FS.collection(COLLECTION);
+    roGuard();
   } catch(e){
     $("#app").innerHTML = '<div class="boot"><img src="' + LOGO + '"><div>' + esc(T("Không tải được ứng dụng. Kiểm tra mạng rồi thử lại.")) + '</div><button class="btn" style="max-width:260px" onclick="location.reload()">' + T("Thử lại") + '</button></div>';
     return;
@@ -2812,13 +2845,13 @@ async function boot(){
   // phiên đăng nhập cũ
   let sess = null; try { sess = JSON.parse(lsGet("mm_sess") || "null"); } catch(e){}
   if (sess && sess.id){
-    S.user = {id: sess.id, name: sess.name, role: sess.role};
+    S.viewAs = lsGet("mm_view") || ""; setUser(sess);
     startLive(); go(PENDING_DEV ? "device" : "home", PENDING_DEV ? {code: PENDING_DEV} : {}, true); PENDING_DEV = null;
     // kiểm tra lại tài khoản (bị khoá / đổi PIN / đổi vai trò)
     R("accounts", sess.id).get().then(s => {
       const a = s.exists ? s.data() : null;
       if (!a || a.active === false || a.hash !== sess.hash){ lsSet("mm_sess", null); S.user = null; stopLive(); loginScreen(false); toast(T("Phiên đăng nhập hết hiệu lực, đăng nhập lại"), "err"); }
-      else if (a.role !== sess.role || a.name !== sess.name){ sess.role = a.role; sess.name = a.name; lsSet("mm_sess", JSON.stringify(sess)); S.user.role = a.role; S.user.name = a.name; startLive(); render(); }
+      else if (a.role !== sess.role || a.name !== sess.name){ sess.role = a.role; sess.name = a.name; lsSet("mm_sess", JSON.stringify(sess)); setUser({id: sess.id, name: a.name, role: a.role}); startLive(); render(); }
     }).catch(() => {});
     return;
   }
@@ -3061,7 +3094,7 @@ const JA = {
 "Người nhập": "入力者",
 "đặt lại bộ đếm": "カウンターリセット",
 "Chưa có lần nhập sản lượng nào.": "生産量の入力はまだありません。",
-"Giám đốc": "社長",
+"Giám đốc": "社長", "Chỉ xem": "閲覧のみ", "Xem như": "表示画面", "Giám đốc chỉ được xem, không thể lưu hay xoá.": "社長は閲覧のみで、保存・削除はできません。",
 "In / PDF": "印刷 / PDF",
 "In lúc {t}": "印刷日時 {t}",
 "Excel": "Excel",
